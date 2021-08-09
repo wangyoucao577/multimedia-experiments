@@ -7,6 +7,7 @@ main (int argc, char *argv[])
   GstBus *bus;
   GstMessage *msg;
   GstStateChangeReturn ret;
+  GMainLoop *main_loop;
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
@@ -41,6 +42,10 @@ main (int argc, char *argv[])
     gst_object_unref (pipeline);
     return -1;
   }
+
+  // run main loop 
+  main_loop = g_main_loop_new (NULL, FALSE);
+  g_main_loop_run (main_loop);
 
   /* Wait until error or EOS */
   bus = gst_element_get_bus (pipeline);
