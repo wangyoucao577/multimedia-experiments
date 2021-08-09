@@ -6,6 +6,7 @@ message("macOSX")
 endif()
 
 project(gst-tutorials)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 
 find_package(PkgConfig REQUIRED) 
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
