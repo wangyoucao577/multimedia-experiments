@@ -16,4 +16,4 @@ link_libraries(${GSTREAMER_LIBRARIES})
 
 add_executable (basic-tutorial-1 src/basic-tutorial-1.c)
 add_executable (basic-tutorial-2 src/basic-tutorial-2.c)
-
+add_executable (basic-tutorial-3 src/basic-tutorial-3.c)
