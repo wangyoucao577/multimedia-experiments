@@ -16,15 +16,16 @@ typedef struct _CustomData
 static void pad_added_handler (GstElement * src, GstPad * pad,
     CustomData * data);
 
+/* Handler for watching bus */
+static gboolean my_bus_callback(GstBus *bus, GstMessage *msg, gpointer data);
+
+
+static GMainLoop *main_loop;
+
 int
 main (int argc, char *argv[])
 {
   CustomData data;
-  GstBus *bus;
-  GstMessage *msg;
-  GstStateChangeReturn ret;
-  gboolean terminate = FALSE;
-  GMainLoop *main_loop;
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
@@ -62,11 +63,10 @@ main (int argc, char *argv[])
       NULL);
 
   /* Connect to the pad-added signal */
-  g_signal_connect (data.source, "pad-added", G_CALLBACK (pad_added_handler),
-      &data);
+  g_signal_connect (data.source, "pad-added", G_CALLBACK (pad_added_handler), &data);
 
   /* Start playing */
-  ret = gst_element_set_state (data.pipeline, GST_STATE_PLAYING);
+  GstStateChangeReturn ret = gst_element_set_state (data.pipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
     g_printerr ("Unable to set the pipeline to the playing state.\n");
     gst_object_unref (data.pipeline);
@@ -74,58 +74,16 @@ main (int argc, char *argv[])
   }
   g_print ("set the pipeline to the playing state.\n");
 
-  // run main loop 
+  /* Listen to the bus */
+  GstBus *bus = gst_element_get_bus (data.pipeline);
+  guint bus_watch_id = gst_bus_add_watch (bus, my_bus_callback, data.pipeline);
+  gst_object_unref (bus);
+
+  /* run main loop */ 
   main_loop = g_main_loop_new (NULL, FALSE);
   g_main_loop_run (main_loop);
-  
-  /* Listen to the bus */
-  bus = gst_element_get_bus (data.pipeline);
-  do {
-    msg = gst_bus_timed_pop_filtered (bus, GST_CLOCK_TIME_NONE,
-        GST_MESSAGE_STATE_CHANGED | GST_MESSAGE_ERROR | GST_MESSAGE_EOS);
-
-    /* Parse message */
-    if (msg != NULL) {
-      GError *err;
-      gchar *debug_info;
-
-      switch (GST_MESSAGE_TYPE (msg)) {
-        case GST_MESSAGE_ERROR:
-          gst_message_parse_error (msg, &err, &debug_info);
-          g_printerr ("Error received from element %s: %s\n",
-              GST_OBJECT_NAME (msg->src), err->message);
-          g_printerr ("Debugging information: %s\n",
-              debug_info ? debug_info : "none");
-          g_clear_error (&err);
-          g_free (debug_info);
-          terminate = TRUE;
-          break;
-        case GST_MESSAGE_EOS:
-          g_print ("End-Of-Stream reached.\n");
-          terminate = TRUE;
-          break;
-        case GST_MESSAGE_STATE_CHANGED:
-          /* We are only interested in state-changed messages from the pipeline */
-          if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data.pipeline)) {
-            GstState old_state, new_state, pending_state;
-            gst_message_parse_state_changed (msg, &old_state, &new_state,
-                &pending_state);
-            g_print ("Pipeline state changed from %s to %s:\n",
-                gst_element_state_get_name (old_state),
-                gst_element_state_get_name (new_state));
-          }
-          break;
-        default:
-          /* We should not reach here */
-          g_printerr ("Unexpected message received.\n");
-          break;
-      }
-      gst_message_unref (msg);
-    }
-  } while (!terminate);
 
   /* Free resources */
-  gst_object_unref (bus);
   gst_element_set_state (data.pipeline, GST_STATE_NULL);
   gst_object_unref (data.pipeline);
   return 0;
@@ -182,4 +140,56 @@ exit:
   /* Unreference the sink pad */
   gst_object_unref (audio_sink_pad);
   gst_object_unref (video_sink_pad);
+}
+
+static gboolean my_bus_callback(GstBus *bus, GstMessage *msg, gpointer data) {
+
+  /* Parse message */
+  if (msg == NULL) {
+    g_printerr ("NULL message.\n");
+    return TRUE;
+  }
+
+  GError *err;
+  gchar *debug_info;
+
+  switch (GST_MESSAGE_TYPE (msg)) {
+    case GST_MESSAGE_ERROR:
+      gst_message_parse_error (msg, &err, &debug_info);
+      g_printerr ("Error received from element %s: %s\n",
+          GST_OBJECT_NAME (msg->src), err->message);
+      g_printerr ("Debugging information: %s\n",
+          debug_info ? debug_info : "none");
+      g_clear_error (&err);
+      g_free (debug_info);
+
+      g_main_loop_quit(main_loop);
+      break;
+    case GST_MESSAGE_EOS:
+      g_print ("End-Of-Stream reached.\n");
+      
+      g_main_loop_quit(main_loop);
+      break;
+    case GST_MESSAGE_STATE_CHANGED:
+      /* We are only interested in state-changed messages from the pipeline */
+      if (GST_MESSAGE_SRC (msg) == GST_OBJECT ((GstElement*)data)) {
+        GstState old_state, new_state, pending_state;
+        gst_message_parse_state_changed (msg, &old_state, &new_state,
+            &pending_state);
+        g_print ("Pipeline state changed from %s to %s:\n",
+            gst_element_state_get_name (old_state),
+            gst_element_state_get_name (new_state));
+      }
+      break;
+    default:
+      /* Ingore not interested messages. */
+      // g_printerr ("Unexpected message %s received.\n", GST_MESSAGE_TYPE_NAME (msg));
+      break;
+  }
+
+  /* we want to be notified again the next time there is a message
+   * on the bus, so returning TRUE (FALSE means we want to stop watching
+   * for messages on the bus and our callback should not be called again)
+   */
+  return TRUE;
 }
