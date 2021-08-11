@@ -35,3 +35,8 @@ RUN cd /usr/local/nginx && stow -v .
 ARG IMAGE_TAG
 ENV IMAGE_TAG ${IMAGE_TAG}
 RUN echo IMAGE_TAG=${IMAGE_TAG} >> /etc/environment
+
+# labels
+LABEL maintainer="wangyoucao577@gmail.com"
+LABEL org.opencontainers.image.source = "https://github.com/wangyoucao577/multimedia-experiments"
+
