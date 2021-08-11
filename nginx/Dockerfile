@@ -28,7 +28,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-instal
   lsb-release locales-all ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /workspace/nginx /usr/local/
+COPY --from=builder /workspace/nginx /usr/local/nginx/
 RUN cd /usr/local/nginx && stow -v .
 
 # for shown on runtime
