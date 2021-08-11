@@ -4,7 +4,7 @@ FROM debian:buster-slim as builder
 # Install packages for building
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-install-recommends -y \
   build-essential \
-  curl wget git \
+  curl wget git ca-certificates \
   libpcre3 libpcre3-dev libssl-dev
 
 # set workspace
