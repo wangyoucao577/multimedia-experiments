@@ -17,7 +17,8 @@ RUN mkdir -p nginx && \
   cd nginx-1.21.1 && \
   ./configure --prefix=../nginx --with-http_ssl_module --add-module=../nginx-rtmp-module && \
   make -j 2 && \
-  make install
+  make install && \
+  cp ../nginx-rtmp-module/stat.xsl /usr/local/nginx/html/
 
 
 FROM debian:buster-slim 
