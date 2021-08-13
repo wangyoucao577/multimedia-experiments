@@ -24,7 +24,7 @@ FROM debian:buster-slim
 
 # Install common tools
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-install-recommends -y \
-  curl wget git vim zip unzip tree stow \
+  curl wget git vim zip unzip tree stow procps net-tools iputils-ping dnsutils \
   lsb-release locales-all ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
