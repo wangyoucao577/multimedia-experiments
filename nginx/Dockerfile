@@ -33,6 +33,9 @@ RUN cd /usr/local/nginx && stow -v .
 
 COPY nginx.conf /usr/local/nginx/conf/
 
+# forward nginx access and error logs to docker log collector
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
+
 # for shown on runtime
 ARG IMAGE_TAG
 ENV IMAGE_TAG ${IMAGE_TAG}
@@ -42,3 +45,10 @@ RUN echo IMAGE_TAG=${IMAGE_TAG} >> /etc/environment
 LABEL maintainer="wangyoucao577@gmail.com"
 LABEL org.opencontainers.image.source = "https://github.com/wangyoucao577/multimedia-experiments"
 
+# expose nginx rtmp & http port
+EXPOSE 1935 
+EXPOSE 8080
+
+STOPSIGNAL SIGQUIT
+
+ENTRYPOINT ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
