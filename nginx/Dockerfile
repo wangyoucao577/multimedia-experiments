@@ -33,9 +33,6 @@ RUN cd /usr/local/nginx && stow -v .
 
 COPY nginx.conf /usr/local/nginx/conf/
 
-# forward nginx access and error logs to docker log collector
-# RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
-
 # for shown on runtime
 ARG IMAGE_TAG
 ENV IMAGE_TAG ${IMAGE_TAG}
@@ -51,4 +48,9 @@ EXPOSE 8080
 
 STOPSIGNAL SIGQUIT
 
-ENTRYPOINT ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
+# forward nginx access and error logs to docker log collector
+RUN ln -sf /dev/stdout /usr/local/nginx/logs/access.log && ln -sf /dev/stderr /usr/local/nginx/logs/error.log
+
+WORKDIR /usr/local/nginx
+
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
