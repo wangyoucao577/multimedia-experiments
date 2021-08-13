@@ -31,6 +31,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-instal
 COPY --from=builder /workspace/nginx /usr/local/nginx/
 RUN cd /usr/local/nginx && stow -v .
 
+COPY nginx.conf /usr/local/nginx/conf/
+
 # for shown on runtime
 ARG IMAGE_TAG
 ENV IMAGE_TAG ${IMAGE_TAG}
