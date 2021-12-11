@@ -33,4 +33,10 @@ $ clang $(pkg-config --cflags --libs libavcodec libavformat libavfilter libavdev
 $ ./build/hello small_bunny_1080p_60fps.mp4
 ```
 
+## Remuxing 
+
+```bash
+$ clang $(pkg-config --cflags --libs libavcodec libavformat libavfilter libavdevice libswresample libswscale libavutil) src/2_remuxing.c -o build/remuxing
+$ ./build/remuxing small_bunny_1080p_60fps.mp4 remuxed_small_bunny_1080p_60fps.ts
+```
 
