@@ -2,9 +2,10 @@
 #include <libavformat/avformat.h>
 #include <stdio.h>
 
-//TODO: decode packets into frames
-static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame);
-//TODO: save a frame into a .pgm file
+// decode packets into frames
+static int decode_packet(AVPacket *v_packet, AVCodecContext *v_codec_context, AVFrame *v_frame);
+
+// save a frame into a .pgm file
 static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, char *filename);
 
 
@@ -148,13 +149,11 @@ int main(int argc, const char* argv[]) {
 }
 
 
-//TODO: implement by hand
-static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame)
+static int decode_packet(AVPacket *v_packet, AVCodecContext *v_codec_context, AVFrame *v_frame)
 {
   // Supply raw packet data as input to a decoder
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
-  int response = avcodec_send_packet(pCodecContext, pPacket);
-
+  int response = avcodec_send_packet(v_codec_context, v_packet);
   if (response < 0) {
     printf("Error while sending a packet to the decoder: %s\n", av_err2str(response));
     return response;
@@ -164,7 +163,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
   {
     // Return decoded output data (into a frame) from a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c
-    response = avcodec_receive_frame(pCodecContext, pFrame);
+    response = avcodec_receive_frame(v_codec_context, v_frame);
     if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
       break;
     } else if (response < 0) {
@@ -174,34 +173,33 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 
     if (response >= 0) {
       printf(
-          "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]\n",
-          pCodecContext->frame_number,
-          av_get_picture_type_char(pFrame->pict_type),
-          pFrame->pkt_size,
-          pFrame->format,
-          pFrame->pts,
-          pFrame->key_frame,
-          pFrame->coded_picture_number
+          "Frame %d (type=%c, size=%d bytes, format=%d) pts %lld key_frame %d [DTS %d]\n",
+          v_codec_context->frame_number,
+          av_get_picture_type_char(v_frame->pict_type),
+          v_frame->pkt_size,
+          v_frame->format,
+          v_frame->pts,
+          v_frame->key_frame,
+          v_frame->coded_picture_number
       );
 
       char frame_filename[1024];
-      snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", pCodecContext->frame_number);
+      snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", v_codec_context->frame_number);
       // Check if the frame is a planar YUV 4:2:0, 12bpp
       // That is the format of the provided .mp4 file
       // RGB formats will definitely not give a gray image
       // Other YUV image may do so, but untested, so give a warning
-      if (pFrame->format != AV_PIX_FMT_YUV420P)
+      if (v_frame->format != AV_PIX_FMT_YUV420P)
       {
         printf("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB\n");
       }
       // save a grayscale frame into a .pgm file
-      save_gray_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename);
+      save_gray_frame(v_frame->data[0], v_frame->linesize[0], v_frame->width, v_frame->height, frame_filename);
     }
   }
   return 0;
 }
 
-//TODO: implement by hand
 static void save_gray_frame(unsigned char *buf, int wrap, int xsize, int ysize, char *filename)
 {
     FILE *f;
