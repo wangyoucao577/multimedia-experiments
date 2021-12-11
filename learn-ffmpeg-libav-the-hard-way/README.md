@@ -30,7 +30,7 @@ ffmpeg version 4.4.1 Copyright (c) 2000-2021 the FFmpeg developers
 
 ```bash
 $ clang $(pkg-config --cflags --libs libavcodec libavformat libavfilter libavdevice libswresample libswscale libavutil) src/0_hello_world.c -o build/hello
-
+$ ./build/hello small_bunny_1080p_60fps.mp4
 ```
 
 
