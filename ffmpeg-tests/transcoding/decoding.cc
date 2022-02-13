@@ -1,5 +1,6 @@
 
 #include "decoding.h"
+#include <thread>
 
 Decoding::~Decoding() {
     release();  // double check to make sure resources can be released properly    
@@ -157,19 +158,50 @@ int Decoding::run() {
             av_log(NULL, AV_LOG_WARNING, "send packet failed, err (%d)%s\n", ret, av_err2str(ret));
             return ret;
         }
+        
+        do {
+            ret = avcodec_receive_frame(dec_ctx_[i].codec_ctx, dec_ctx_[i].frame);
+            if (ret == 0) {
+                dec_ctx_[i].recv_count++;
+                av_frame_unref(dec_ctx_[i].frame);
+            } else if (ret == AVERROR(EAGAIN)) {
+                //av_log(NULL, AV_LOG_INFO, "no frame available, fill in more data and try again later\n");
+            } else if (ret == AVERROR_EOF) {
+                av_log(NULL, AV_LOG_INFO, "decode has been flushed\n");
+            } else {
+                av_log(NULL, AV_LOG_ERROR, "receive frame failed unexpectly, err (%d)%s\n", ret, av_err2str(ret));
+                return ret;
+            }
+        } while(ret == 0);
+    }
 
-        ret = avcodec_receive_frame(dec_ctx_[i].codec_ctx, dec_ctx_[i].frame);
-        if (ret == 0) {
-            dec_ctx_[i].recv_count++;
-            av_frame_unref(dec_ctx_[i].frame);
-        } else if (ret == AVERROR(EAGAIN)) {
-            av_log(NULL, AV_LOG_INFO, "no frame available, fill in more data and try again later\n");
-        } else if (ret == AVERROR_EOF) {
-            av_log(NULL, AV_LOG_INFO, "decode has been flushed\n");
-        } else {
-            av_log(NULL, AV_LOG_ERROR, "receive frame failed unexpectly, err (%d)%s\n", ret, av_err2str(ret));
+    for (auto i = 0; i < nb_streams_; ++i) {
+        if (!dec_ctx_[i].codec_ctx) {
+            continue;
+        }
+
+        auto ret = avcodec_send_packet(dec_ctx_[i].codec_ctx, nullptr);    // notify to flush decoder
+        if (ret < 0) {
+            av_log(NULL, AV_LOG_WARNING, "notify to flush decoder failed, err (%d)%s\n", ret, av_err2str(ret));
             return ret;
         }
+
+        while(true) {
+            ret = avcodec_receive_frame(dec_ctx_[i].codec_ctx, dec_ctx_[i].frame);
+            if (ret == 0) {
+                dec_ctx_[i].recv_count++;
+                av_frame_unref(dec_ctx_[i].frame);
+            } else if (ret == AVERROR(EAGAIN)) {
+                av_log(NULL, AV_LOG_INFO, "stream %d no frame available, fill in more data and try again later\n", i);
+                std::this_thread::yield();
+            } else if (ret == AVERROR_EOF) {
+                av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
+                break;
+            } else {
+                av_log(NULL, AV_LOG_ERROR, "receive frame failed unexpectly, err (%d)%s\n", ret, av_err2str(ret));
+                return ret;
+            }
+        };
     }
 
     // statistics
