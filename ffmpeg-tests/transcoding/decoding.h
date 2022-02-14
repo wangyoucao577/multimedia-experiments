@@ -2,7 +2,7 @@
 #pragma once
 
 #include "libav_headers.h"
-#include <cstddef>
+#include <cassert>
 #include <string>
 
 struct DecodingContext {
