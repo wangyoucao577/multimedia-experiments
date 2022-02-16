@@ -11,42 +11,24 @@ project (ffmpeg_tests)
 set(CMAKE_CXX_STANDARD "14")
 set(CMAKE_EXPORT_COMPILE_COMMANDS "1")
 
-find_package(PkgConfig)
+find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(LIBAVUTIL REQUIRED libavutil)
-pkg_check_modules(LIBAVFORMAT REQUIRED libavformat)
-pkg_check_modules(LIBAVCODEC REQUIRED libavcodec)
-pkg_check_modules(LIBAVFILTER REQUIRED libavfilter)
-pkg_check_modules(LIBAVDEVICE REQUIRED libavdevice)
-pkg_check_modules(LIBSWRESAMPLE REQUIRED libswresample)
-pkg_check_modules(LIBSWSCALE REQUIRED libswscale)
-include_directories(
-    ${LIBAVUTIL_INCLUDE_DIRS} 
-    ${LIBAVFORMAT_INCLUDE_DIRS} 
-    ${LIBAVCODEC_INCLUDE_DIRS} 
-    ${LIBAVFILTER_INCLUDE_DIRS}
-    ${LIBAVDEVICE_INCLUDE_DIRS}
-    ${LIBSWRESAMPLE_INCLUDE_DIRS}
-    ${LIBSWSCALE_INCLUDE_DIRS}
+# import ffmpeg
+pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET 
+    libavutil
+    libavformat
+    libavcodec
+    libavfilter
+    libavdevice
+    libswresample
+    libswscale
 )
-link_directories(
-    ${LIBAVUTIL_LIBRARY_DIRS} 
-    ${LIBAVFORMAT_LIBRARY_DIRS} 
-    ${LIBAVCODEC_LIBRARY_DIRS} 
-    ${LIBAVFILTER_LIBRARY_DIRS}
-    ${LIBAVDEVICE_LIBRARY_DIRS}
-    ${LIBSWRESAMPLE_LIBRARY_DIRS}
-    ${LIBSWSCALE_LIBRARY_DIRS}
-)
-link_libraries(
-    ${LIBAVFORMAT_LIBRARIES}
-    ${LIBAVCODEC_LIBRARIES} 
-    ${LIBAVFILTER_LIBRARIES}
-    ${LIBAVDEVICE_LIBRARIES}
-    ${LIBSWRESAMPLE_LIBRARIES}
-    ${LIBSWSCALE_LIBRARIES}
-    ${LIBAVUTIL_LIBRARIES} 
-)
+include_directories(${LIBFFMPEG_INCLUDE_DIRS})
+link_libraries(PkgConfig::LIBFFMPEG)
+
+if (UNIX)
+link_libraries("-pthread")
+endif()
 
 aux_source_directory(transcoding TRANSCODING_SRCS)
 add_executable ("transcoding" ${TRANSCODING_SRCS})
