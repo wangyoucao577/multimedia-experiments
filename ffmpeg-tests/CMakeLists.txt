@@ -13,7 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS "1")
 
 find_package(PkgConfig REQUIRED)
 
-# import ffmpeg
+# import ffmpeg, openssl
 pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET 
     libavutil
     libavformat
@@ -24,7 +24,8 @@ pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET
     libswscale
 )
 include_directories(${LIBFFMPEG_INCLUDE_DIRS})
-link_libraries(PkgConfig::LIBFFMPEG)
+pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
+link_libraries(PkgConfig::LIBFFMPEG PkgConfig::OPENSSL)
 
 if (UNIX)
 link_libraries("-pthread")
