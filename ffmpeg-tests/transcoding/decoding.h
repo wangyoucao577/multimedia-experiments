@@ -4,11 +4,13 @@
 #include <cassert>
 #include <functional>
 #include <string>
+#include <thread>
 
 #include "libav_headers.h"
 
 using DataCallback = int(int stream_index, const AVMediaType media_type,
                          AVFrame *f);
+using ErrorCallback = int(int);
 
 class Decoding {
 public:
@@ -23,7 +25,10 @@ public:
 public:
   int Open();
   void Close();
+
   int Run();
+  int RunAsync(std::function<ErrorCallback> error_callback);
+  void Join();
 
   void DumpInputFormat() const;
 
@@ -55,8 +60,10 @@ private:
 
 private:
   bool opened{false};
+  std::thread t_;
 
   std::function<DataCallback> data_callback_ = nullptr;
+  std::function<ErrorCallback> error_callback_ = nullptr;
 
   const std::string input_file_;
 };

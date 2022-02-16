@@ -8,6 +8,8 @@ Decoding::~Decoding() {
 }
 
 void Decoding::release() {
+  Join();
+
   if (pkt_) {
     av_packet_free(&pkt_);
   }
@@ -152,6 +154,9 @@ int Decoding::run() {
 
       av_log(NULL, AV_LOG_WARNING, "read frame failed, err (%d)%s\n", ret,
              av_err2str(ret));
+      if (error_callback_) {
+        error_callback_(ret);
+      }
       return ret;
     }
 
@@ -168,6 +173,9 @@ int Decoding::run() {
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING, "send packet failed, err (%d)%s\n", ret,
              av_err2str(ret));
+      if (error_callback_) {
+        error_callback_(ret);
+      }
       return ret;
     }
 
@@ -183,6 +191,9 @@ int Decoding::run() {
       av_log(NULL, AV_LOG_ERROR,
              "stream %d receive frame failed unexpectly, err (%d)%s\n", i, ret,
              av_err2str(ret));
+      if (error_callback_) {
+        error_callback_(ret);
+      }
       return ret;
     }
   }
@@ -198,6 +209,9 @@ int Decoding::run() {
       av_log(NULL, AV_LOG_WARNING,
              "notify to flush decoder failed, err (%d)%s\n", ret,
              av_err2str(ret));
+      if (error_callback_) {
+        error_callback_(ret);
+      }
       return ret;
     }
 
@@ -210,6 +224,9 @@ int Decoding::run() {
       av_log(NULL, AV_LOG_ERROR,
              "stream %d receive frame failed unexpectly, err (%d)%s\n", i, ret,
              av_err2str(ret));
+      if (error_callback_) {
+        error_callback_(ret);
+      }
       return ret;
     }
   }
@@ -251,4 +268,20 @@ int Decoding::receive_frames(int stream_index) {
   } while (ret == AVERROR_OK);
 
   return ret;
+}
+
+void Decoding::Join() {
+  if (t_.joinable()) {
+    t_.join();
+  }
+}
+
+int Decoding::RunAsync(std::function<ErrorCallback> error_callback) {
+  if (!opened) {
+    return AVERROR_OK;
+  }
+  error_callback_ = std::move(error_callback);
+  t_ = std::move(std::thread(&Decoding::run, this));
+
+  return AVERROR_OK;
 }

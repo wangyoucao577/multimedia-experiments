@@ -36,14 +36,21 @@ int main(int argc, char *argv[]) {
     return 0;
   };
 
+  auto err_func = [](int err) -> int {
+    av_log(NULL, AV_LOG_ERROR, "decoding error %d\n", err);
+    return 0;
+  };
+
   auto dec = std::make_unique<Decoding>(input_url, std::move(data_func));
   auto ret = dec->Open();
   if (ret != AVERROR_OK) {
     return ret;
   }
   dec->DumpInputFormat();
-  ret = dec->Run();
-  assert(ret == AVERROR_OK);
+  // ret = dec->Run();
+  // assert(ret == AVERROR_OK);
+  dec->RunAsync(std::move(err_func));
+  dec->Join();
   dec->Close();
 
   av_log(NULL, AV_LOG_INFO,
