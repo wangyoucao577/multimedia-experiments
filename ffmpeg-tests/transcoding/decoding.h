@@ -2,24 +2,22 @@
 #pragma once
 
 #include <cassert>
+#include <functional>
 #include <string>
 
 #include "libav_headers.h"
 
-struct DecodingContext {
-  AVCodecContext *codec_ctx;
-  AVFrame *frame;
-
-  int send_count;
-  int recv_count;
-};
+using DataCallback = int(int stream_index, const AVMediaType media_type,
+                         AVFrame *f);
 
 class Decoding {
 public:
   Decoding() = delete;
   Decoding(const Decoding &) = delete;
   Decoding(Decoding &&) = delete;
-  Decoding(const std::string &input_file) : input_file_(input_file) {}
+  Decoding(const std::string &input_file,
+           std::function<DataCallback> data_callback)
+      : input_file_(input_file), data_callback_(std::move(data_callback)) {}
   ~Decoding();
 
 public:
@@ -34,6 +32,18 @@ private:
 
   int run();
 
+  // receive all frames on a stream
+  int receive_frames(int stream_index);
+
+private:
+  struct DecodingContext {
+    AVCodecContext *codec_ctx;
+    AVFrame *frame;
+
+    int in_count;
+    int out_count;
+  };
+
 private:
   AVFormatContext *ifmt_ctx_{nullptr};
 
@@ -46,6 +56,7 @@ private:
 private:
   bool opened{false};
 
-private:
+  std::function<DataCallback> data_callback_ = nullptr;
+
   const std::string input_file_;
 };

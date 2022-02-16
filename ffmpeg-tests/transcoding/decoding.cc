@@ -141,14 +141,18 @@ int Decoding::Run() {
 }
 
 int Decoding::run() {
+  auto ret = AVERROR_OK;
+
   while (true) {
-    auto ret = av_read_frame(ifmt_ctx_, pkt_);
+    ret = av_read_frame(ifmt_ctx_, pkt_);
     if (ret < 0) {
-      if (ret != AVERROR_EOF) {
-        av_log(NULL, AV_LOG_WARNING, "read frame failed, err (%d)%s\n", ret,
-               av_err2str(ret));
+      if (ret == AVERROR_EOF) {
+        break; // all packets have been consumed
       }
-      break;
+
+      av_log(NULL, AV_LOG_WARNING, "read frame failed, err (%d)%s\n", ret,
+             av_err2str(ret));
+      return ret;
     }
 
     int i = pkt_->stream_index;
@@ -159,7 +163,7 @@ int Decoding::run() {
     }
 
     ret = avcodec_send_packet(dec_ctx_[i].codec_ctx, pkt_);
-    dec_ctx_[i].send_count++;
+    dec_ctx_[i].in_count++;
     av_packet_unref(pkt_); // pkt_ always requires `unref` after use
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING, "send packet failed, err (%d)%s\n", ret,
@@ -167,23 +171,20 @@ int Decoding::run() {
       return ret;
     }
 
-    do {
-      ret = avcodec_receive_frame(dec_ctx_[i].codec_ctx, dec_ctx_[i].frame);
-      if (ret == 0) {
-        dec_ctx_[i].recv_count++;
-        av_frame_unref(dec_ctx_[i].frame);
-      } else if (ret == AVERROR(EAGAIN)) {
-        // av_log(NULL, AV_LOG_INFO, "no frame available, fill in more data and
-        // try again later\n");
-      } else if (ret == AVERROR_EOF) {
-        av_log(NULL, AV_LOG_INFO, "decode has been flushed\n");
-      } else {
-        av_log(NULL, AV_LOG_ERROR,
-               "receive frame failed unexpectly, err (%d)%s\n", ret,
-               av_err2str(ret));
-        return ret;
-      }
-    } while (ret == 0);
+    ret = receive_frames(i);
+    assert(ret != AVERROR_OK);
+    if (ret == AVERROR(EAGAIN)) {
+      // av_log(NULL, AV_LOG_INFO, "no frame available, fill in more data and
+      // try again later\n");
+    } else if (ret == AVERROR_EOF) {
+      av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
+      break;
+    } else {
+      av_log(NULL, AV_LOG_ERROR,
+             "stream %d receive frame failed unexpectly, err (%d)%s\n", i, ret,
+             av_err2str(ret));
+      return ret;
+    }
   }
 
   for (auto i = 0; i < nb_streams_; ++i) {
@@ -200,27 +201,17 @@ int Decoding::run() {
       return ret;
     }
 
-    while (true) {
-      ret = avcodec_receive_frame(dec_ctx_[i].codec_ctx, dec_ctx_[i].frame);
-      if (ret == 0) {
-        dec_ctx_[i].recv_count++;
-        av_frame_unref(dec_ctx_[i].frame);
-      } else if (ret == AVERROR(EAGAIN)) {
-        av_log(NULL, AV_LOG_INFO,
-               "stream %d no frame available, fill in more data and try again "
-               "later\n",
-               i);
-        std::this_thread::yield();
-      } else if (ret == AVERROR_EOF) {
-        av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
-        break;
-      } else {
-        av_log(NULL, AV_LOG_ERROR,
-               "receive frame failed unexpectly, err (%d)%s\n", ret,
-               av_err2str(ret));
-        return ret;
-      }
-    };
+    ret = receive_frames(i);
+    assert(ret != AVERROR_OK && ret != AVERROR(EAGAIN));
+    if (ret == AVERROR_EOF) {
+      av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
+      continue;
+    } else {
+      av_log(NULL, AV_LOG_ERROR,
+             "stream %d receive frame failed unexpectly, err (%d)%s\n", i, ret,
+             av_err2str(ret));
+      return ret;
+    }
   }
 
   // statistics
@@ -230,8 +221,34 @@ int Decoding::run() {
     }
     av_log(NULL, AV_LOG_INFO,
            "stream %d total read frames %d, decoded frames %d\n", i,
-           dec_ctx_[i].send_count, dec_ctx_[i].recv_count);
+           dec_ctx_[i].in_count, dec_ctx_[i].out_count);
   }
 
   return AVERROR_OK;
+}
+
+int Decoding::receive_frames(int stream_index) {
+  assert(stream_index >= 0 && stream_index < nb_streams_);
+  auto &dec_ctx = dec_ctx_[stream_index];
+
+  auto ret = AVERROR_OK;
+  do {
+    ret = avcodec_receive_frame(dec_ctx.codec_ctx, dec_ctx.frame);
+    if (ret != AVERROR_OK) {
+      break;
+    }
+
+    dec_ctx.out_count++;
+
+    // callback
+    if (data_callback_) {
+      data_callback_(stream_index, dec_ctx.codec_ctx->codec_type,
+                     dec_ctx.frame);
+    }
+
+    av_frame_unref(dec_ctx.frame);
+
+  } while (ret == AVERROR_OK);
+
+  return ret;
 }
