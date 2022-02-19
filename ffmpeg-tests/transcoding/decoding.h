@@ -31,6 +31,8 @@ public:
   void Join();
 
   void DumpInputFormat() const;
+  const AVFormatContext *InputContext() const { return ifmt_ctx_; }
+  const AVCodecContext *CodecContext(AVMediaType media_type) const;
 
 private:
   void release();

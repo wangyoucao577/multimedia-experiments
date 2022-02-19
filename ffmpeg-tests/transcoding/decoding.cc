@@ -1,8 +1,6 @@
 
 #include "decoding.h"
 
-#include <thread>
-
 Decoding::~Decoding() {
   release(); // double check to make sure resources can be released properly
 }
@@ -284,4 +282,18 @@ int Decoding::RunAsync(std::function<ErrorCallback> error_callback) {
   t_ = std::move(std::thread(&Decoding::run, this));
 
   return AVERROR_OK;
+}
+
+const AVCodecContext *Decoding::CodecContext(AVMediaType media_type) const {
+  if (!dec_ctx_ || nb_streams_ == 0) {
+    return nullptr;
+  }
+
+  for (int i = 0; i < nb_streams_; ++i) {
+    if (dec_ctx_[i].codec_ctx->codec_type == media_type) {
+      return dec_ctx_[i].codec_ctx;
+    }
+  }
+
+  return nullptr;
 }
