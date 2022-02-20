@@ -252,7 +252,7 @@ int Encoding::run() {
       return ret;
     }
 
-    ret = receive_packets(enc_ctx);
+    ret = receive_packets(stream_index, enc_ctx);
     assert(ret != AVERROR_OK);
     if (ret == AVERROR(EAGAIN)) {
       if (enc_ctx.out_count == 0) {
@@ -314,7 +314,7 @@ int Encoding::findEncodingContextIndex(AVMediaType media_type) const {
   return -1;
 }
 
-int Encoding::receive_packets(EncodingContext &enc_ctx) {
+int Encoding::receive_packets(int stream_index, EncodingContext &enc_ctx) {
 
   auto ret = AVERROR_OK;
   do {
@@ -324,13 +324,17 @@ int Encoding::receive_packets(EncodingContext &enc_ctx) {
     }
     enc_ctx.out_count++;
 
-    // TODO: write to muxer
+    /* prepare packet for muxing */
+    enc_ctx.pkt->stream_index = stream_index;
+    av_packet_rescale_ts(enc_ctx.pkt, enc_ctx.codec_ctx->time_base,
+                         ofmt_ctx_->streams[stream_index]->time_base);
 
-    // callback
-    // if (data_callback_) {
-    //   data_callback_(stream_index, dec_ctx.codec_ctx->codec_type,
-    //                  dec_ctx.frame);
-    // }
+    av_log(NULL, AV_LOG_DEBUG, "[Encoding] stream %d type %s muxing frame\n",
+           stream_index,
+           av_get_media_type_string(enc_ctx.codec_ctx->codec_type));
+
+    /* mux encoded frame */
+    ret = av_interleaved_write_frame(ofmt_ctx_, enc_ctx.pkt);
 
     av_packet_unref(enc_ctx.pkt);
 

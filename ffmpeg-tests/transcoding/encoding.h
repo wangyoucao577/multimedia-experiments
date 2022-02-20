@@ -50,7 +50,7 @@ private:
   int findEncodingContextIndex(AVMediaType media_type) const;
 
   // receive all packets on a stream
-  int receive_packets(EncodingContext &enc_ctx);
+  int receive_packets(int stream_index, EncodingContext &enc_ctx);
 
 private:
   AVFormatContext *ofmt_ctx_{nullptr};
