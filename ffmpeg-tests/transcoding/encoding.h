@@ -1,7 +1,11 @@
 
 #include "libav_headers.h"
+#include <condition_variable>
+#include <mutex>
+#include <queue>
+#include <set>
 #include <string>
-
+#include <thread>
 class Encoding {
 public:
   Encoding() = delete;
@@ -14,25 +18,39 @@ public:
   int Open(const AVCodecContext *v_dec_ctx, const AVCodecContext *a_dec_ctx);
   void Close();
 
-  int Run();
-  //   int RunAsync(std::function<ErrorCallback> error_callback);
-  //   void Join();
+  // int Run();
+  int RunAsync();
+  void Join();
+
+  int SendFrame(const AVFrame *frame, AVMediaType media_type);
 
   void DumpInputFormat() const;
 
 private:
-  void release();
+  struct EncodingContext {
+    AVCodecContext *codec_ctx = nullptr;
+    AVPacket *pkt = nullptr;
 
-  //  int run();
+    int in_count = 0;
+    int out_count = 0;
+  };
+
+  struct AVFrameWithMediaType {
+    AVFrame *frame = nullptr;
+    AVMediaType media_type = AVMEDIA_TYPE_UNKNOWN;
+  };
 
 private:
-  struct EncodingContext {
-    AVCodecContext *codec_ctx;
-    AVPacket *pkt;
+  void release();
 
-    int in_count;
-    int out_count;
-  };
+  int run();
+
+  int pushFrame(const AVFrame *frame, AVMediaType media_type);
+
+  int findEncodingContextIndex(AVMediaType media_type) const;
+
+  // receive all packets on a stream
+  int receive_packets(EncodingContext &enc_ctx);
 
 private:
   AVFormatContext *ofmt_ctx_{nullptr};
@@ -41,12 +59,15 @@ private:
   int nb_streams_{0};
   EncodingContext *enc_ctx_ = {
       nullptr}; // ctx per stream, length depends on `nb_streams_`
-
-  AVFrame *frame_{nullptr};
+  std::set<AVMediaType> enabled_media_types_;
 
 private:
   bool opened{false};
-  //   std::thread t_;
+  std::thread t_;
+
+  std::mutex mtx_;
+  std::condition_variable cv_;
+  std::queue<AVFrameWithMediaType> frame_queue_;
 
   //   std::function<DataCallback> data_callback_ = nullptr;
   //   std::function<ErrorCallback> error_callback_ = nullptr;

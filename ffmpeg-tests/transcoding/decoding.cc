@@ -180,10 +180,19 @@ int Decoding::run() {
     ret = receive_frames(i);
     assert(ret != AVERROR_OK);
     if (ret == AVERROR(EAGAIN)) {
-      // av_log(NULL, AV_LOG_INFO, "no frame available, fill in more data and
-      // try again later\n");
+      if (dec_ctx_[i].out_count == 0) {
+        av_log(NULL, AV_LOG_INFO,
+               "<Decoding> stream %d type %s no packet available, curr in %d, "
+               "fill in "
+               "more data and try "
+               "again later\n",
+               i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
+               dec_ctx_[i].in_count);
+      }
     } else if (ret == AVERROR_EOF) {
-      av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
+      av_log(NULL, AV_LOG_INFO,
+             "<Decoding> stream %d type %s decoder has been flushed\n", i,
+             av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type));
       break;
     } else {
       av_log(NULL, AV_LOG_ERROR,
@@ -216,7 +225,9 @@ int Decoding::run() {
     ret = receive_frames(i);
     assert(ret != AVERROR_OK && ret != AVERROR(EAGAIN));
     if (ret == AVERROR_EOF) {
-      av_log(NULL, AV_LOG_INFO, "stream %d decoder has been flushed\n", i);
+      av_log(NULL, AV_LOG_INFO,
+             "<Decoding> stream %d type %s decoder has been flushed\n", i,
+             av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type));
       continue;
     } else {
       av_log(NULL, AV_LOG_ERROR,
@@ -235,7 +246,9 @@ int Decoding::run() {
       continue;
     }
     av_log(NULL, AV_LOG_INFO,
-           "stream %d total read frames %d, decoded frames %d\n", i,
+           "<Decoding> stream %d type %s total read packets %d, decoded frames "
+           "%d\n",
+           i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
            dec_ctx_[i].in_count, dec_ctx_[i].out_count);
   }
 
@@ -249,11 +262,13 @@ int Decoding::receive_frames(int stream_index) {
   auto ret = AVERROR_OK;
   do {
     ret = avcodec_receive_frame(dec_ctx.codec_ctx, dec_ctx.frame);
-    if (ret != AVERROR_OK) {
+    if (ret != AVERROR_OK && ret != AVERROR_EOF) {
       break;
     }
 
-    dec_ctx.out_count++;
+    if (ret == AVERROR_OK) {
+      dec_ctx.out_count++;
+    }
 
     // callback
     if (data_callback_) {
@@ -279,7 +294,7 @@ int Decoding::RunAsync(std::function<ErrorCallback> error_callback) {
     return AVERROR_OK;
   }
   error_callback_ = std::move(error_callback);
-  t_ = std::move(std::thread(&Decoding::run, this));
+  t_ = std::thread(&Decoding::run, this);
 
   return AVERROR_OK;
 }

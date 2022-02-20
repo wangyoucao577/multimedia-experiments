@@ -6,8 +6,18 @@ Encoding::~Encoding() { release(); }
 void Encoding::Close() { release(); }
 
 void Encoding::release() {
-  if (frame_) {
-    av_frame_free(&frame_);
+  Join();
+
+  if (!frame_queue_.empty()) {
+    assert(false);
+    while (!frame_queue_.empty()) {
+      auto f = frame_queue_.front();
+      frame_queue_.pop();
+
+      if (f.frame) {
+        av_frame_free(&f.frame);
+      }
+    }
   }
 
   if (enc_ctx_) {
@@ -124,6 +134,8 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       return ret;
     }
     stream->time_base = enc_ctx->time_base;
+
+    enabled_media_types_.insert(dec_ctx->codec_type);
   }
 
   if (!(ofmt_ctx_->oformat->flags & AVFMT_NOFILE)) {
@@ -156,4 +168,173 @@ void Encoding::DumpInputFormat() const {
     return;
   }
   av_dump_format(ofmt_ctx_, 0, output_file_.c_str(), 1);
+}
+
+void Encoding::Join() {
+  if (!t_.joinable()) {
+    return;
+  }
+  t_.join();
+}
+
+int Encoding::RunAsync() {
+  if (!opened) {
+    return AVERROR_OK;
+  }
+  t_ = std::thread(&Encoding::run, this);
+
+  return AVERROR_OK;
+}
+
+int Encoding::pushFrame(const AVFrame *frame, AVMediaType media_type) {
+  {
+    std::lock_guard<std::mutex> _(mtx_);
+    auto new_f = av_frame_clone(frame);
+    frame_queue_.emplace(AVFrameWithMediaType{new_f, media_type});
+  }
+  cv_.notify_one();
+
+  return AVERROR_OK;
+}
+
+int Encoding::SendFrame(const AVFrame *frame, AVMediaType media_type) {
+  auto it = enabled_media_types_.find(media_type);
+  if (it == enabled_media_types_.end()) {
+    return AVERROR_OK; // ignore disabled media type
+  }
+  return pushFrame(frame, media_type);
+}
+
+int Encoding::run() {
+  int finished_streams = 0;
+
+  while (finished_streams != nb_streams_) {
+    AVFrameWithMediaType new_frame;
+    {
+      std::unique_lock<std::mutex> lk(mtx_);
+      if (frame_queue_.empty()) {
+        cv_.wait(lk);
+      }
+
+      if (frame_queue_.empty()) {
+        continue; // maybe empty even if notified
+      }
+
+      new_frame = frame_queue_.front();
+      frame_queue_.pop();
+    }
+
+    int stream_index = findEncodingContextIndex(new_frame.media_type);
+    if (stream_index < 0) {
+      //   av_log(NULL, AV_LOG_WARNING, "ignore media type %s\n",
+      //          av_get_media_type_string(new_frame.media_type));
+      if (new_frame.frame) {
+        av_frame_free(&new_frame.frame);
+      }
+      continue;
+    }
+
+    auto &enc_ctx = enc_ctx_[stream_index];
+    auto ret = avcodec_send_frame(enc_ctx.codec_ctx, new_frame.frame);
+    if (new_frame.frame) {
+      if (new_frame.frame->buf[0]) {
+        enc_ctx.in_count++; // ignore blank frame
+      }
+
+      av_frame_free(&new_frame.frame);
+    }
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_WARNING, "send frame failed, err (%d)%s\n", ret,
+             av_err2str(ret));
+      //   if (error_callback_) {
+      //     error_callback_(ret);
+      //   }
+      return ret;
+    }
+
+    ret = receive_packets(enc_ctx);
+    assert(ret != AVERROR_OK);
+    if (ret == AVERROR(EAGAIN)) {
+      if (enc_ctx.out_count == 0) {
+        av_log(NULL, AV_LOG_INFO,
+               "[Encoding] stream %d type %s no packet available, curr in %d, "
+               "fill in "
+               "more data and try "
+               "again later\n",
+               stream_index, av_get_media_type_string(new_frame.media_type),
+               enc_ctx.in_count);
+      }
+    } else if (ret == AVERROR_EOF) {
+      av_log(NULL, AV_LOG_INFO,
+             "[Encoding] stream %d type %s encoder has been flushed\n",
+             stream_index, av_get_media_type_string(new_frame.media_type));
+      ++finished_streams;
+      continue;
+    } else {
+      av_log(NULL, AV_LOG_ERROR,
+             "stream %d receive frame failed unexpectly, err (%d)%s\n",
+             stream_index, ret, av_err2str(ret));
+      //   if (error_callback_) {
+      //     error_callback_(ret);
+      //   }
+      return ret;
+    }
+  }
+
+  // statistics
+  for (auto i = 0; i < nb_streams_; i++) {
+    if (!enc_ctx_[i].codec_ctx) {
+      continue;
+    }
+    av_log(NULL, AV_LOG_INFO,
+           "[Encoding] stream %d type %s total read frames %d, encoded "
+           "packets %d\n",
+           i, av_get_media_type_string(enc_ctx_[i].codec_ctx->codec_type),
+           enc_ctx_[i].in_count, enc_ctx_[i].out_count);
+  }
+
+  return AVERROR_OK;
+}
+
+int Encoding::findEncodingContextIndex(AVMediaType media_type) const {
+  if (!enc_ctx_) {
+    return -1;
+  }
+
+  for (int i = 0; i < nb_streams_; ++i) {
+    if (!enc_ctx_[i].codec_ctx) {
+      continue;
+    }
+
+    if (enc_ctx_[i].codec_ctx->codec_type == media_type) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+int Encoding::receive_packets(EncodingContext &enc_ctx) {
+
+  auto ret = AVERROR_OK;
+  do {
+    ret = avcodec_receive_packet(enc_ctx.codec_ctx, enc_ctx.pkt);
+    if (ret != AVERROR_OK) {
+      break;
+    }
+    enc_ctx.out_count++;
+
+    // TODO: write to muxer
+
+    // callback
+    // if (data_callback_) {
+    //   data_callback_(stream_index, dec_ctx.codec_ctx->codec_type,
+    //                  dec_ctx.frame);
+    // }
+
+    av_packet_unref(enc_ctx.pkt);
+
+  } while (ret == AVERROR_OK);
+
+  return ret;
 }
