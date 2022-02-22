@@ -1,11 +1,14 @@
 
 #include "libav_headers.h"
+
+#include <cassert>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <set>
 #include <string>
 #include <thread>
+
 class Encoding {
 public:
   Encoding() = delete;
