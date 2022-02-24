@@ -28,6 +28,7 @@ pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
 link_libraries(PkgConfig::LIBFFMPEG PkgConfig::OPENSSL)
 
 if (UNIX)
+link_libraries("-lx264")    # apt install libx264-dev
 link_libraries("-pthread")
 endif()
 
