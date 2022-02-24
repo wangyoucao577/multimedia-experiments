@@ -31,7 +31,12 @@ void Encoding::release() {
   nb_streams_ = 0;
 
   if (ofmt_ctx_) {
-    avformat_close_input(&ofmt_ctx_);
+    if (!(ofmt_ctx_->oformat->flags & AVFMT_NOFILE)) {
+      avio_closep(&ofmt_ctx_->pb);
+    }
+
+    avformat_free_context(ofmt_ctx_);
+    ofmt_ctx_ = nullptr;
   }
 }
 
@@ -83,14 +88,17 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       release();
       return AVERROR(ENOMEM);
     }
-    enc_ctx_[nb_streams_].codec_ctx = enc_ctx;
-    enc_ctx_[nb_streams_].pkt = av_packet_alloc();
-    if (!enc_ctx_[nb_streams_].pkt) {
+
+    auto stream_index = nb_streams_;
+    nb_streams_++;
+
+    enc_ctx_[stream_index].codec_ctx = enc_ctx;
+    enc_ctx_[stream_index].pkt = av_packet_alloc();
+    if (!enc_ctx_[stream_index].pkt) {
       av_log(NULL, AV_LOG_ERROR, "Failed to allocate the encoder packet\n");
       release();
       return AVERROR(ENOMEM);
     }
-    ++nb_streams_;
 
     if (dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
       enc_ctx->height = dec_ctx->height;
@@ -107,6 +115,12 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       /* video time_base can be set to whatever is handy and supported by
        * encoder */
       enc_ctx->time_base = av_inv_q(dec_ctx->framerate);
+      av_log(NULL, AV_LOG_INFO,
+             "[encoding] stream %d type %s set codec time base %d/%d from "
+             "decode framerate %d/%d\n",
+             stream_index, av_get_media_type_string(enc_ctx->codec_type),
+             enc_ctx->time_base.num, enc_ctx->time_base.den,
+             dec_ctx->framerate.num, dec_ctx->framerate.den);
     } else if (dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
       // TODO:
       assert(false);
@@ -134,6 +148,13 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       return ret;
     }
     stream->time_base = enc_ctx->time_base;
+    av_log(
+        NULL, AV_LOG_INFO,
+        "[encoding] stream %d type %s time_base %d/%d, codec time_base %d/%d\n",
+        stream_index, av_get_media_type_string(enc_ctx->codec_type),
+        ofmt_ctx_->streams[0]->time_base.num,
+        ofmt_ctx_->streams[0]->time_base.den, enc_ctx->time_base.num,
+        enc_ctx->time_base.den);
 
     enabled_media_types_.insert(dec_ctx->codec_type);
   }
@@ -157,6 +178,17 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
            av_err2str(ret));
     release();
     return ret;
+  }
+
+  for (int i = 0; i < nb_streams_; ++i) {
+    av_log(
+        NULL, AV_LOG_INFO,
+        "[encoding] after avformat_write_header, stream %d type %s time_base "
+        "%d/%d\n",
+        i,
+        av_get_media_type_string(ofmt_ctx_->streams[i]->codecpar->codec_type),
+        ofmt_ctx_->streams[i]->time_base.num,
+        ofmt_ctx_->streams[i]->time_base.den);
   }
 
   opened = true;
@@ -281,6 +313,13 @@ int Encoding::run() {
     }
   }
 
+  auto ret = av_write_trailer(ofmt_ctx_);
+  if (ret != AVERROR_OK) {
+    av_log(NULL, AV_LOG_ERROR, "[Encoding] write trailer failed, (%d)%s\n", ret,
+           av_err2str(ret));
+    return ret;
+  }
+
   // statistics
   for (auto i = 0; i < nb_streams_; i++) {
     if (!enc_ctx_[i].codec_ctx) {
@@ -326,12 +365,18 @@ int Encoding::receive_packets(int stream_index, EncodingContext &enc_ctx) {
 
     /* prepare packet for muxing */
     enc_ctx.pkt->stream_index = stream_index;
-    av_packet_rescale_ts(enc_ctx.pkt, enc_ctx.codec_ctx->time_base,
+
+    // TODO: use in-stream time_base
+    av_packet_rescale_ts(enc_ctx.pkt, AVRational{1, 15360},
                          ofmt_ctx_->streams[stream_index]->time_base);
 
-    av_log(NULL, AV_LOG_DEBUG, "[Encoding] stream %d type %s muxing frame\n",
+    av_log(NULL, AV_LOG_DEBUG,
+           "[Encoding] stream %d type %s muxing frame, pts %" PRId64
+           " dts %" PRId64 ", duration %" PRId64 ", time base %d/%d\n",
            stream_index,
-           av_get_media_type_string(enc_ctx.codec_ctx->codec_type));
+           av_get_media_type_string(enc_ctx.codec_ctx->codec_type),
+           enc_ctx.pkt->pts, enc_ctx.pkt->dts, enc_ctx.pkt->duration,
+           enc_ctx.pkt->time_base.num, enc_ctx.pkt->time_base.den);
 
     /* mux encoded frame */
     ret = av_interleaved_write_frame(ofmt_ctx_, enc_ctx.pkt);

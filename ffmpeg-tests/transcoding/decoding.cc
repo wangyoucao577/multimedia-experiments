@@ -72,8 +72,10 @@ int Decoding::Open() {
     auto stream = ifmt_ctx_->streams[i];
     assert(stream);
 
-    if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
-        stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
+    // TODO: disable audio currently
+    //  if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
+    //      stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
+    if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
       av_log(NULL, AV_LOG_WARNING, "ignore non A/V stream %d, type (%d)%s\n", i,
              stream->codecpar->codec_type,
              av_get_media_type_string(stream->codecpar->codec_type));
@@ -123,6 +125,17 @@ int Decoding::Open() {
     }
     dec_ctx_[i].frame = av_frame_alloc();
     assert(dec_ctx_[i].frame);
+
+    if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+      av_log(NULL, AV_LOG_INFO,
+             "<decoding> stream time_base %d/%d, codec time base %d/%d, pkt "
+             "time base %d/%d\n",
+             stream->time_base.num, stream->time_base.den,
+             dec_ctx_[i].codec_ctx->time_base.num,
+             dec_ctx_[i].codec_ctx->time_base.den,
+             dec_ctx_[i].codec_ctx->pkt_timebase.num,
+             dec_ctx_[i].codec_ctx->pkt_timebase.den);
+    }
   }
   pkt_ = av_packet_alloc();
   assert(pkt_);
@@ -164,6 +177,13 @@ int Decoding::run() {
       av_packet_unref(pkt_);
       continue; // ignored stream
     }
+
+    av_log(NULL, AV_LOG_DEBUG,
+           "<decoding> stream %d type %s read packet pts %" PRId64
+           ", dts %" PRId64 ", duration %" PRId64 ", time_base %d/%d\n",
+           i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
+           pkt_->pts, pkt_->dts, pkt_->duration, pkt_->time_base.num,
+           pkt_->time_base.den);
 
     ret = avcodec_send_packet(dec_ctx_[i].codec_ctx, pkt_);
     dec_ctx_[i].in_count++;

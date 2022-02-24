@@ -30,9 +30,13 @@ int main(int argc, char *argv[]) {
              stream_index, av_get_media_type_string(media_type));
     } else {
       if (media_type == AVMEDIA_TYPE_VIDEO) {
-        // av_log(NULL, AV_LOG_INFO, "stream %d frame pict_type %c\n",
-        // stream_index,
-        //        av_get_picture_type_char(f->pict_type));
+        av_log(NULL, AV_LOG_DEBUG,
+               "stream %d frame pict_type %c, pts %" PRId64 ", pkt_dts %" PRId64
+               ", pkt_duration %" PRId64 ", best_effort_timestamp %" PRId64
+               ", time_base %d/%d\n",
+               stream_index, av_get_picture_type_char(f->pict_type), f->pts,
+               f->pkt_dts, f->pkt_duration, f->best_effort_timestamp,
+               f->time_base.num, f->time_base.den);
         ++total_decoded_video;
       } else if (media_type == AVMEDIA_TYPE_AUDIO) {
         // av_log(NULL, AV_LOG_INFO, "stream %d frame samples %d\n",
