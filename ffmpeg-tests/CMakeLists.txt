@@ -28,9 +28,13 @@ pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
 link_libraries(PkgConfig::LIBFFMPEG PkgConfig::OPENSSL)
 
 if (UNIX)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 link_libraries("-lx264")    # apt install libx264-dev
 link_libraries("-pthread")
 endif()
+endif()
 
 aux_source_directory(transcoding TRANSCODING_SRCS)
-add_executable ("transcoding" ${TRANSCODING_SRCS})
+file(GLOB TRANSCODING_HEADERS "transcoding/*.h")
+
+add_executable ("transcoding" ${TRANSCODING_SRCS} ${TRANSCODING_HEADERS})
