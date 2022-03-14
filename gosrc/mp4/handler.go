@@ -54,7 +54,7 @@ func (h *Handler) Parse() error {
 			}
 		} else {
 			//TODO:
-			glog.Infof("ignore unknown type %s, payload %d", basicBox.Type, basicBox.PayloadSize())
+			glog.Infof("ignore unknown type %s, size %d payload %d", basicBox.Type, basicBox.Size, basicBox.PayloadSize())
 			h.f.Seek(int64(basicBox.PayloadSize()), 1)
 		}
 
