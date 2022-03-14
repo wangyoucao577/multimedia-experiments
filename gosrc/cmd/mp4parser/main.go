@@ -21,7 +21,7 @@ func main() {
 	m := mp4.New(flags.inputFilePath)
 	if err := m.Parse(); err != nil {
 		if err != io.EOF {
-			glog.Error("Parse mp4 failed, err %v", err)
+			glog.Errorf("Parse mp4 failed, err %v", err)
 			exit.Fail()
 		}
 	}
