@@ -33,8 +33,8 @@ type Header struct {
 type Box struct {
 	Header
 
-	Version uint8
-	Flags   [3]byte // 24 bits
+	// Version uint8
+	// Flags   [3]byte // 24 bits
 
 	// internal fields
 	payloadSize uint64
@@ -52,7 +52,8 @@ func (h Header) String() string {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%+v} Version:%d Flags:%v PayloadSize:%d", b.Header, b.Version, b.Flags, b.payloadSize)
+	//return fmt.Sprintf("Header:{%+v} Version:%d Flags:%v PayloadSize:%d", b.Header, b.Version, b.Flags, b.payloadSize)
+	return fmt.Sprintf("Header:{%+v} PayloadSize:%d", b.Header, b.payloadSize)
 }
 
 // PayloadSize returns payload size, 0 means continue to the end.
@@ -100,15 +101,15 @@ func (b *Box) Parse(r io.Reader) error {
 		parsedBytes += 16
 	}
 
-	if b.Size == 0 || b.Size > parsedBytes || b.LargeSize > uint64(parsedBytes) {
-		if err := util.ReadOrError(r, data); err != nil {
-			return err
-		} else {
-			b.Version = data[0]
-			copy(b.Flags[:], data[1:])
-			parsedBytes += 4
-		}
-	}
+	// if b.Size == 0 || b.Size > parsedBytes || b.LargeSize > uint64(parsedBytes) {
+	// 	if err := util.ReadOrError(r, data); err != nil {
+	// 		return err
+	// 	} else {
+	// 		b.Version = data[0]
+	// 		copy(b.Flags[:], data[1:])
+	// 		parsedBytes += 4
+	// 	}
+	// }
 
 	if b.Size == 1 {
 		b.payloadSize = uint64(b.LargeSize) - uint64(parsedBytes)
