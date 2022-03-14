@@ -34,8 +34,8 @@ type Box struct {
 	Version uint8
 	Flags   [3]byte // 24 bits
 
-	// calculated fields
-	PayloadSize uint64
+	// internal fields
+	payloadSize uint64
 }
 
 // String serializes FixedArray4Bytes.
@@ -50,12 +50,16 @@ func (h Header) String() string {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%+v} Version:%d Flags:%v PayloadSize:%d", b.Header, b.Version, b.Flags, b.PayloadSize)
+	return fmt.Sprintf("Header:{%+v} Version:%d Flags:%v PayloadSize:%d", b.Header, b.Version, b.Flags, b.payloadSize)
+}
+
+// PayloadSize returns payload size, 0 means continue to the end.
+func (b *Box) PayloadSize() uint64 {
+	return b.payloadSize
 }
 
 // Parse parses basic box contents.
 func (b *Box) Parse(r io.Reader) error {
-
 	var parsedBytes uint32
 
 	data := make([]byte, 4)
@@ -105,9 +109,9 @@ func (b *Box) Parse(r io.Reader) error {
 	}
 
 	if b.Size == 1 {
-		b.PayloadSize = uint64(b.LargeSize) - uint64(parsedBytes)
+		b.payloadSize = uint64(b.LargeSize) - uint64(parsedBytes)
 	} else if b.Size > 1 {
-		b.PayloadSize = uint64(b.Size) - uint64(parsedBytes)
+		b.payloadSize = uint64(b.Size) - uint64(parsedBytes)
 	}
 
 	return nil

@@ -28,8 +28,9 @@ func (b Box) String() string {
 func (b *Box) ParsePayload(r io.Reader) error {
 
 	var parsedBytes uint32
+	payloadSize := b.PayloadSize()
 
-	if b.PayloadSize > 0 {
+	if payloadSize > 0 {
 		if err := util.ReadOrError(r, b.MajorBrand[:]); err != nil {
 			return err
 		} else {
@@ -42,7 +43,7 @@ func (b *Box) ParsePayload(r io.Reader) error {
 			parsedBytes += 4
 		}
 
-		for parsedBytes < uint32(b.PayloadSize) {
+		for parsedBytes < uint32(payloadSize) {
 			var data [4]byte
 			if err := util.ReadOrError(r, data[:]); err != nil {
 				return err
