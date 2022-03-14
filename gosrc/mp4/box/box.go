@@ -13,6 +13,7 @@ import (
 const (
 	TypeFtyp = "ftyp"
 	TypeFree = "free"
+	TypeSkip = "skip"
 
 	TypeUUID = "uuid"
 )

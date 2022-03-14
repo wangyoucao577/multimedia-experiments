@@ -54,7 +54,7 @@ func (h *Handler) Parse() error {
 				glog.Warningf("parse ftyp box failed, err %v", err)
 				return err
 			}
-		} else if typeStr == box.TypeFree {
+		} else if typeStr == box.TypeFree || typeStr == box.TypeSkip {
 			freeBox := free.Box{
 				Box: basicBox,
 			}
