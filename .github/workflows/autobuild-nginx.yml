@@ -4,6 +4,8 @@ on:
   push:
     branches:
     - '**'
+    path:
+    - 'nginx/**'
 
 env:
   IMAGE_NAME: nginx
