@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box/free"
 	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box/ftyp"
 )
 
@@ -44,7 +45,8 @@ func (h *Handler) Parse() error {
 			return err
 		}
 
-		if string(basicBox.Type[:]) == box.TypeFtyp {
+		typeStr := string(basicBox.Type[:])
+		if typeStr == box.TypeFtyp {
 			h.Ftyp = &ftyp.Box{
 				Box: basicBox,
 			}
@@ -52,6 +54,15 @@ func (h *Handler) Parse() error {
 				glog.Warningf("parse ftyp box failed, err %v", err)
 				return err
 			}
+		} else if typeStr == box.TypeFree {
+			freeBox := free.Box{
+				Box: basicBox,
+			}
+			if err := freeBox.ParsePayload(h.f); err != nil {
+				glog.Warningf("parse free box failed, err %v", err)
+				return err
+			}
+			h.Free = append(h.Free, freeBox)
 		} else {
 			//TODO: other types
 			glog.Infof("ignore unknown type %s, size %d payload %d", basicBox.Type, basicBox.Size, basicBox.PayloadSize())

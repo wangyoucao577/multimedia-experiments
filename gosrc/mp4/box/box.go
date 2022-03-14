@@ -12,6 +12,7 @@ import (
 // Box types
 const (
 	TypeFtyp = "ftyp"
+	TypeFree = "free"
 
 	TypeUUID = "uuid"
 )

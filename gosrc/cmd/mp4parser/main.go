@@ -27,5 +27,6 @@ func main() {
 	}
 
 	glog.Infof("ftyp{%+v}", m.Boxes.Ftyp)
+	glog.Infof("free{%+v}", m.Boxes.Free)
 
 }
