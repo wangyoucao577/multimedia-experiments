@@ -2,6 +2,7 @@
 package ftyp
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 
@@ -14,7 +15,7 @@ type Box struct {
 	box.Header
 
 	MajorBrand       box.FixedArray4Bytes
-	MinorVersion     box.FixedArray4Bytes
+	MinorVersion     uint32
 	CompatibleBrands []box.FixedArray4Bytes
 }
 
@@ -27,8 +28,8 @@ func New(h box.Header) box.Box {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} MajorBrand:%s MinorVersion:%s CompatibleBrands:%v",
-		b.Header, string(b.MajorBrand[:]), string(b.MinorVersion[:]), b.CompatibleBrands)
+	return fmt.Sprintf("Header:{%v} MajorBrand:%s MinorVersion:%d CompatibleBrands:%v",
+		b.Header, string(b.MajorBrand[:]), b.MinorVersion, b.CompatibleBrands)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -44,9 +45,11 @@ func (b *Box) ParsePayload(r io.Reader) error {
 			parsedBytes += 4
 		}
 
-		if err := util.ReadOrError(r, b.MinorVersion[:]); err != nil {
+		minorVersionData := make([]byte, 4)
+		if err := util.ReadOrError(r, minorVersionData); err != nil {
 			return err
 		} else {
+			b.MinorVersion = binary.BigEndian.Uint32(minorVersionData)
 			parsedBytes += 4
 		}
 

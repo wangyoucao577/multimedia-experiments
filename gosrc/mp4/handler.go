@@ -35,6 +35,29 @@ func New(filePath string) *Handler {
 	}
 }
 
+// return error indicates whether box type unregistered.
+func (h *Handler) createBox(bh box.Header) (box.Box, error) {
+
+	creator, ok := h.boxesCreator[bh.Type.String()]
+	if !ok {
+		return nil, fmt.Errorf("unregistered box type %s, size %d payload %d", bh.Type.String(), bh.Size, bh.PayloadSize())
+	}
+
+	b := creator(bh)
+	if b == nil {
+		glog.Fatalf("create box type %s failed", bh.Type.String())
+	}
+
+	if bh.Type.String() == box.TypeFtyp {
+		h.Ftyp = b.(*ftyp.Box)
+	} else if bh.Type.String() == box.TypeFree || bh.Type.String() == box.TypeSkip {
+		h.Free = append(h.Free, *b.(*free.Box))
+		b = &h.Free[len(h.Free)-1] // reference to the last empty free box
+	}
+
+	return b, nil
+}
+
 // Parse parses mp4 file.
 func (h *Handler) Parse() error {
 
@@ -73,29 +96,6 @@ func (h *Handler) Parse() error {
 	}
 
 	return nil
-}
-
-// return error indicates whether box type unregistered.
-func (h *Handler) createBox(bh box.Header) (box.Box, error) {
-
-	creator, ok := h.boxesCreator[bh.Type.String()]
-	if !ok {
-		return nil, fmt.Errorf("unregistered box type %s, size %d payload %d", bh.Type.String(), bh.Size, bh.PayloadSize())
-	}
-
-	b := creator(bh)
-	if b == nil {
-		glog.Fatalf("create box type %s failed", bh.Type.String())
-	}
-
-	if bh.Type.String() == box.TypeFtyp {
-		h.Ftyp = b.(*ftyp.Box)
-	} else if bh.Type.String() == box.TypeFree || bh.Type.String() == box.TypeSkip {
-		h.Free = append(h.Free, *b.(*free.Box))
-		b = &h.Free[len(h.Free)-1] // reference to the last empty free box
-	}
-
-	return b, nil
 }
 
 // Open opens mp4 file.
