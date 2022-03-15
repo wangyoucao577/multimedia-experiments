@@ -2,7 +2,6 @@
 package mp4
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,31 +54,17 @@ func (h *Handler) Parse() error {
 			return err
 		}
 
-		typeStr := string(boxHeader.Type[:])
-		creator, ok := h.boxesCreator[typeStr]
-		if !ok {
+		b, err := h.createBox(boxHeader)
+		if err != nil {
 			//TODO: other types
-			glog.Infof("ignore unregistered box type %s, size %d payload %d", typeStr, boxHeader.Size, boxHeader.PayloadSize())
+			glog.Warningf("ignore %v", err)
 			h.f.Seek(int64(boxHeader.PayloadSize()), 1)
 			continue
-		}
-
-		b := creator(boxHeader)
-		if b == nil {
-			s := fmt.Sprintf("create box type %s failed", typeStr)
-			glog.Warning(s)
-			return errors.New(s)
 		}
 
 		if err := b.ParsePayload(h.f); err != nil {
 			glog.Warningf("parse box type %s payload failed, err %v", string(boxHeader.Type[:]), err)
 			return err
-		}
-
-		if typeStr == box.TypeFtyp {
-			h.Ftyp = b.(*ftyp.Box)
-		} else if typeStr == box.TypeFree || typeStr == box.TypeSkip {
-			h.Free = append(h.Free, *b.(*free.Box))
 		}
 
 		if boxHeader.Size == 0 {
@@ -88,6 +73,29 @@ func (h *Handler) Parse() error {
 	}
 
 	return nil
+}
+
+// return error indicates whether box type unregistered.
+func (h *Handler) createBox(bh box.Header) (box.Box, error) {
+
+	creator, ok := h.boxesCreator[bh.Type.String()]
+	if !ok {
+		return nil, fmt.Errorf("unregistered box type %s, size %d payload %d", bh.Type.String(), bh.Size, bh.PayloadSize())
+	}
+
+	b := creator(bh)
+	if b == nil {
+		glog.Fatalf("create box type %s failed", bh.Type.String())
+	}
+
+	if bh.Type.String() == box.TypeFtyp {
+		h.Ftyp = b.(*ftyp.Box)
+	} else if bh.Type.String() == box.TypeFree || bh.Type.String() == box.TypeSkip {
+		h.Free = append(h.Free, *b.(*free.Box))
+		b = &h.Free[len(h.Free)-1] // reference to the last empty free box
+	}
+
+	return b, nil
 }
 
 // Open opens mp4 file.
