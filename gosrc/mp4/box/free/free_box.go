@@ -16,6 +16,13 @@ type Box struct {
 	Data []byte
 }
 
+// New creates a new Box.
+func New(h box.Header) box.Box {
+	return &Box{
+		Header: h,
+	}
+}
+
 // String serializes Box.
 func (b Box) String() string {
 	return fmt.Sprintf("Header:{%v} Data:%s", b.Header, string(b.Data))

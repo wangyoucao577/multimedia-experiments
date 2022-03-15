@@ -18,6 +18,13 @@ type Box struct {
 	CompatibleBrands []box.FixedArray4Bytes
 }
 
+// New creates a new Box.
+func New(h box.Header) box.Box {
+	return &Box{
+		Header: h,
+	}
+}
+
 // String serializes Box.
 func (b Box) String() string {
 	return fmt.Sprintf("Header:{%v} MajorBrand:%s MinorVersion:%s CompatibleBrands:%v",

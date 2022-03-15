@@ -2,6 +2,8 @@
 package mp4
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -17,12 +19,20 @@ type Handler struct {
 
 	f        *os.File
 	filePath string
+
+	boxesCreator map[string]box.NewFunc
 }
 
 // New creates mp4 Handler.
 func New(filePath string) *Handler {
 	return &Handler{
 		filePath: filePath,
+
+		boxesCreator: map[string]box.NewFunc{
+			box.TypeFtyp: ftyp.New,
+			box.TypeFree: free.New,
+			box.TypeSkip: free.New,
+		},
 	}
 }
 
@@ -46,31 +56,34 @@ func (h *Handler) Parse() error {
 		}
 
 		typeStr := string(boxHeader.Type[:])
-		if typeStr == box.TypeFtyp {
-			h.Ftyp = &ftyp.Box{
-				Header: boxHeader,
-			}
-			if err := h.Ftyp.ParsePayload(h.f); err != nil {
-				glog.Warningf("parse ftyp box failed, err %v", err)
-				return err
-			}
-		} else if typeStr == box.TypeFree || typeStr == box.TypeSkip {
-			freeBox := free.Box{
-				Header: boxHeader,
-			}
-			if err := freeBox.ParsePayload(h.f); err != nil {
-				glog.Warningf("parse free box failed, err %v", err)
-				return err
-			}
-			h.Free = append(h.Free, freeBox)
-		} else {
+		creator, ok := h.boxesCreator[typeStr]
+		if !ok {
 			//TODO: other types
-			glog.Infof("ignore unknown type %s, size %d payload %d", boxHeader.Type, boxHeader.Size, boxHeader.PayloadSize())
+			glog.Infof("ignore unregistered box type %s, size %d payload %d", typeStr, boxHeader.Size, boxHeader.PayloadSize())
 			h.f.Seek(int64(boxHeader.PayloadSize()), 1)
+			continue
+		}
+
+		b := creator(boxHeader)
+		if b == nil {
+			s := fmt.Sprintf("create box type %s failed", typeStr)
+			glog.Warning(s)
+			return errors.New(s)
+		}
+
+		if err := b.ParsePayload(h.f); err != nil {
+			glog.Warningf("parse box type %s payload failed, err %v", string(boxHeader.Type[:]), err)
+			return err
+		}
+
+		if typeStr == box.TypeFtyp {
+			h.Ftyp = b.(*ftyp.Box)
+		} else if typeStr == box.TypeFree || typeStr == box.TypeSkip {
+			h.Free = append(h.Free, *b.(*free.Box))
 		}
 
 		if boxHeader.Size == 0 {
-			break
+			break // last box has been parsed
 		}
 	}
 
