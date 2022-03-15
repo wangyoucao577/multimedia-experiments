@@ -11,7 +11,7 @@ import (
 
 // Box represents a ftyp box.
 type Box struct {
-	box.Box
+	box.Header
 
 	MajorBrand       box.FixedArray4Bytes
 	MinorVersion     box.FixedArray4Bytes
@@ -20,8 +20,8 @@ type Box struct {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Box:{%v} MajorBrand:%s MinorVersion:%s CompatibleBrands:%v",
-		b.Box, string(b.MajorBrand[:]), string(b.MinorVersion[:]), b.CompatibleBrands)
+	return fmt.Sprintf("Header:{%v} MajorBrand:%s MinorVersion:%s CompatibleBrands:%v",
+		b.Header, string(b.MajorBrand[:]), string(b.MinorVersion[:]), b.CompatibleBrands)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

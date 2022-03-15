@@ -11,14 +11,14 @@ import (
 
 // Box represents a ftyp box.
 type Box struct {
-	box.Box
+	box.Header
 
 	Data []byte
 }
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Box:{%v} Data:%s", b.Box, string(b.Data))
+	return fmt.Sprintf("Header:{%v} Data:%s", b.Header, string(b.Data))
 }
 
 // ParsePayload parse payload which requires basic box already exist.

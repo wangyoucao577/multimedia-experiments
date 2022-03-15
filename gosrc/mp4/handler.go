@@ -36,19 +36,19 @@ func (h *Handler) Parse() error {
 	defer h.close()
 
 	for {
-		basicBox := box.Box{}
-		if err := basicBox.Parse(h.f); err != nil {
+		boxHeader := box.Header{}
+		if err := boxHeader.Parse(h.f); err != nil {
 			if err == io.EOF {
 				break
 			}
-			glog.Warningf("parse box failed, err %v", err)
+			glog.Warningf("parse box header failed, err %v", err)
 			return err
 		}
 
-		typeStr := string(basicBox.Type[:])
+		typeStr := string(boxHeader.Type[:])
 		if typeStr == box.TypeFtyp {
 			h.Ftyp = &ftyp.Box{
-				Box: basicBox,
+				Header: boxHeader,
 			}
 			if err := h.Ftyp.ParsePayload(h.f); err != nil {
 				glog.Warningf("parse ftyp box failed, err %v", err)
@@ -56,7 +56,7 @@ func (h *Handler) Parse() error {
 			}
 		} else if typeStr == box.TypeFree || typeStr == box.TypeSkip {
 			freeBox := free.Box{
-				Box: basicBox,
+				Header: boxHeader,
 			}
 			if err := freeBox.ParsePayload(h.f); err != nil {
 				glog.Warningf("parse free box failed, err %v", err)
@@ -65,11 +65,11 @@ func (h *Handler) Parse() error {
 			h.Free = append(h.Free, freeBox)
 		} else {
 			//TODO: other types
-			glog.Infof("ignore unknown type %s, size %d payload %d", basicBox.Type, basicBox.Size, basicBox.PayloadSize())
-			h.f.Seek(int64(basicBox.PayloadSize()), 1)
+			glog.Infof("ignore unknown type %s, size %d payload %d", boxHeader.Type, boxHeader.Size, boxHeader.PayloadSize())
+			h.f.Seek(int64(boxHeader.PayloadSize()), 1)
 		}
 
-		if basicBox.Size == 0 {
+		if boxHeader.Size == 0 {
 			break
 		}
 	}

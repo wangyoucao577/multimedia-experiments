@@ -27,14 +27,6 @@ type Header struct {
 	Type      FixedArray4Bytes // 32 bits
 	LargeSize uint64
 	UserType  [16]uint8
-}
-
-// Box represents box structure.
-type Box struct {
-	Header
-
-	// Version uint8
-	// Flags   [3]byte // 24 bits
 
 	// internal fields
 	payloadSize uint64
@@ -47,22 +39,16 @@ func (f FixedArray4Bytes) String() string {
 
 // String serializes Header.
 func (h Header) String() string {
-	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s", h.Size, string(h.Type[:]), h.LargeSize, (h.UserType[:]))
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	//return fmt.Sprintf("Header:{%+v} Version:%d Flags:%v PayloadSize:%d", b.Header, b.Version, b.Flags, b.payloadSize)
-	return fmt.Sprintf("Header:{%+v} PayloadSize:%d", b.Header, b.payloadSize)
+	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s payloadSize:%d", h.Size, string(h.Type[:]), h.LargeSize, (h.UserType[:]), h.payloadSize)
 }
 
 // PayloadSize returns payload size, 0 means continue to the end.
-func (b *Box) PayloadSize() uint64 {
-	return b.payloadSize
+func (h Header) PayloadSize() uint64 {
+	return h.payloadSize
 }
 
 // Parse parses basic box contents.
-func (b *Box) Parse(r io.Reader) error {
+func (h *Header) Parse(r io.Reader) error {
 	var parsedBytes uint32
 
 	data := make([]byte, 4)
@@ -71,31 +57,31 @@ func (b *Box) Parse(r io.Reader) error {
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
-		b.Size = binary.BigEndian.Uint32(data)
+		h.Size = binary.BigEndian.Uint32(data)
 		parsedBytes += 4
 	}
 
 	// type
-	if err := util.ReadOrError(r, b.Type[:]); err != nil {
+	if err := util.ReadOrError(r, h.Type[:]); err != nil {
 		return err
 	}
 	parsedBytes += 4
 
 	// large size
-	if b.Size == 1 {
+	if h.Size == 1 {
 		largeData := make([]byte, 8)
 
 		if err := util.ReadOrError(r, largeData); err != nil {
 			return err
 		} else {
-			b.LargeSize = binary.BigEndian.Uint64(largeData)
+			h.LargeSize = binary.BigEndian.Uint64(largeData)
 			parsedBytes += 8
 		}
 	}
 
 	// user type
-	if string(b.Type[:]) == TypeUUID {
-		if err := util.ReadOrError(r, b.UserType[:]); err != nil {
+	if string(h.Type[:]) == TypeUUID {
+		if err := util.ReadOrError(r, h.UserType[:]); err != nil {
 			return err
 		}
 		parsedBytes += 16
@@ -111,10 +97,10 @@ func (b *Box) Parse(r io.Reader) error {
 	// 	}
 	// }
 
-	if b.Size == 1 {
-		b.payloadSize = uint64(b.LargeSize) - uint64(parsedBytes)
-	} else if b.Size > 1 {
-		b.payloadSize = uint64(b.Size) - uint64(parsedBytes)
+	if h.Size == 1 {
+		h.payloadSize = uint64(h.LargeSize) - uint64(parsedBytes)
+	} else if h.Size > 1 {
+		h.payloadSize = uint64(h.Size) - uint64(parsedBytes)
 	}
 
 	return nil
