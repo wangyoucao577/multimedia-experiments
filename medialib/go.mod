@@ -1,4 +1,4 @@
-module github.com/wangyoucao577/multimedia-experiments/gosrc
+module github.com/wangyoucao577/multimedia-experiments/medialib
 
 go 1.17
 

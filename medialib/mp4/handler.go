@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box/free"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box/ftyp"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/free"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/ftyp"
 )
 
 // Handler represents handler for `mp4` structure.

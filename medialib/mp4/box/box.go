@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
 // Box types

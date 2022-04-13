@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/golang/glog"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/util/exit"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/exit"
 )
 
 func main() {

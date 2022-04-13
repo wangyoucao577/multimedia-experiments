@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/gosrc/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
 // Box represents a ftyp box.
