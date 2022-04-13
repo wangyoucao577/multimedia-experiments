@@ -2,18 +2,18 @@
 RTMP接收并分析FLV的sample. 通过librtmp实现从RTMP服务器视音频流拉取, 并自己实现FLV的协议分析(参照FLV的协议标准 "Adobe Flash Video File Format Specification Version 10.1").     
 
 ## 阅读与运行 
-- `Linux`:   
-		`CentOS7 64bit, Kernel 3.10.0-229.el7.x86_64, gcc 4.8.5 20150623`   
-	- 编译并安装`librtmp`    
-		- 本项目代码中的rtmp拉流部分依赖于`librtmp`实现, `librtmp`为`rtmpdump`工具的一部分, 故需下载并编译安装最新的`rtmpdump`版本, 链接如下:    
-			- https://rtmpdump.mplayerhq.hu/    
-			- 实验时用的`rtmpdump`版本为`RTMPDump v2.30`    
-		
-	- 编译运行代码    
-	```   
-	g++ -std=c++11 FlvHeader.cc FlvCommon.cc  FlvTagHeader.cc FlvTag.cc RTMPSession.cc main.cc -lrtmp   
-	./a.out <rtmp_url>  
-	```   
+- 编译并安装`librtmp`    
+	- 本项目代码中的rtmp拉流部分依赖于`librtmp`实现, `librtmp`为`rtmpdump`工具的一部分, 故需下载并编译安装最新的`rtmpdump`版本, 链接如下:    
+		- https://rtmpdump.mplayerhq.hu/    
+		- 实验时用的`rtmpdump`版本为`RTMPDump v2.30`    
+	
+- 编译运行代码    
+```   
+mkdir -p build
+cd build
+cmake ..
+./rtmp-flv <rtmp_url>  
+```   
 
 ## 代码说明   
 - main.cc  
