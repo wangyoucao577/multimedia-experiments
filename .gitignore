@@ -58,4 +58,6 @@ out/
 # clangd cache
 .cache/
 
+# mac temp files
+.DS_Store
 
