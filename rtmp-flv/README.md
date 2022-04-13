@@ -6,7 +6,8 @@ RTMP接收并分析FLV的sample. 通过librtmp实现从RTMP服务器视音频流
 	- 本项目代码中的rtmp拉流部分依赖于`librtmp`实现, `librtmp`为`rtmpdump`工具的一部分, 故需下载并编译安装最新的`rtmpdump`版本, 链接如下:    
 		- https://rtmpdump.mplayerhq.hu/    
 		- 实验时用的`rtmpdump`版本为`RTMPDump v2.30`    
-	
+    - 也可以通过`apt install librtmp-dev`安装
+
 - 编译运行代码    
 ```   
 mkdir -p build
