@@ -1,6 +1,7 @@
 
 
 #include <assert.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,7 +42,8 @@ int main(int argc, char *argv[]) {
     rtmp_session = new RTMPSession(argv[1]);
     rtmp_session->Connect();
   } catch (RTMPSessionErrorCode e) {
-    cout << "Init RTMP session failed, errno " << static_cast<int>(e) << endl;
+    cout << "Init RTMP session failed, error code " << static_cast<int>(e)
+         << ", h_error (" << h_errno << ") " << hstrerror(h_errno) << endl;
     if (rtmp_session) {
       delete rtmp_session;
     }
