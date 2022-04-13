@@ -15,6 +15,9 @@ using namespace std;
 #define DUMP_FLV_FILE
 
 // TODO: fix raw dump
+//   currently raw audio can not play due to missed ADTS header
+//   raw video can not play due to no sps/pps headers as well as NALU start
+//   header
 // #define DUMP_RAW_AUDIO_FILE
 // #define DUMP_RAW_VIDEO_FILE
 
