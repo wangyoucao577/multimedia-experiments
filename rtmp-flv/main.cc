@@ -13,7 +13,10 @@ using namespace std;
 #include "RTMPSession.h"
 
 #define DUMP_FLV_FILE
-#define DUMP_ES_FILE
+
+// TODO: fix raw dump
+// #define DUMP_RAW_AUDIO_FILE
+// #define DUMP_RAW_VIDEO_FILE
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -23,16 +26,23 @@ int main(int argc, char *argv[]) {
   }
 
 #ifdef DUMP_FLV_FILE
-  FILE *fp = fopen("rtmp.flv", "wb");
+  FILE *fp = fopen("test.flv", "wb");
   if (!fp) {
-    cout << "Open file rtmp.flv failed" << endl;
+    cout << "Open file test.flv failed" << endl;
     return -1;
   }
 #endif
-#ifdef DUMP_ES_FILE
-  FILE *fp_es = fopen("video_audio.es", "wb");
-  if (!fp_es) {
-    cout << "Open file video_audio_es failed" << endl;
+#ifdef DUMP_RAW_AUDIO_FILE
+  FILE *fp_aac = fopen("test.aac", "wb");
+  if (!fp_aac) {
+    cout << "Open file test.aac failed" << endl;
+    return -1;
+  }
+#endif
+#ifdef DUMP_RAW_VIDEO_FILE
+  FILE *fp_h264 = fopen("test.h264", "wb");
+  if (!fp_h264) {
+    cout << "Open file test.h264 failed" << endl;
     return -1;
   }
 #endif
@@ -91,17 +101,22 @@ int main(int argc, char *argv[]) {
           FlvTag ft(buff + offset, useful_bytes - offset);
           ft.Dump();
 
-          if (ft.GetTagType() == kFlyTagTypeAudio) {
-
-#ifdef DUMP_ES_FILE
-            // write ES
+#ifdef DUMP_RAW_AUDIO_FILE
+          if (ft.GetTagType() == kFlyTagTypeAudio && ft.GetTagDataLength()) {
             // TODO: write的ES文件是否正确?? 待验证
             int es_write =
-                fwrite(ft.GetDataPointer(), 1, ft.GetTagDataLength(), fp_es);
+                fwrite(ft.GetDataPointer(), 1, ft.GetTagDataLength(), fp_aac);
             assert(es_write == ft.GetTagDataLength());
-#endif
           }
-
+#endif
+#ifdef DUMP_RAW_VIDEO_FILE
+          if (ft.GetTagType() == kFlyTagTypeVideo && ft.GetTagDataLength()) {
+            // TODO: write的ES文件是否正确?? 待验证
+            int es_write =
+                fwrite(ft.GetDataPointer(), 1, ft.GetTagDataLength(), fp_h264);
+            assert(es_write == ft.GetTagDataLength());
+          }
+#endif
           offset += ft.cost_bytes(); // for header
         }
         next_previous_tag_size = !next_previous_tag_size;
@@ -135,9 +150,14 @@ int main(int argc, char *argv[]) {
     fclose(fp);
   }
 #endif
-#ifdef DUMP_ES_FILE
-  if (fp_es) {
-    fclose(fp_es);
+#ifdef DUMP_RAW_AUDIO_FILE
+  if (fp_aac) {
+    fclose(fp_aac);
+  }
+#endif
+#ifdef DUMP_RAW_VIDEO_FILE
+  if (fp_h264) {
+    fclose(fp_h264);
   }
 #endif
 
