@@ -15,6 +15,7 @@ const (
 	TypeFree = "free"
 	TypeSkip = "skip"
 	TypeMdat = "mdat"
+	TypeMoov = "moov"
 
 	TypeUUID = "uuid"
 )

@@ -11,6 +11,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/free"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/ftyp"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdat"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov"
 )
 
 // Handler represents handler for `mp4` structure.
@@ -33,6 +34,7 @@ func New(filePath string) *Handler {
 			box.TypeFree: free.New,
 			box.TypeSkip: free.New,
 			box.TypeMdat: mdat.New,
+			box.TypeMoov: moov.New,
 		},
 	}
 }
@@ -57,6 +59,8 @@ func (h *Handler) createBox(bh box.Header) (box.Box, error) {
 		b = &h.Free[len(h.Free)-1] // reference to the last empty free box
 	} else if bh.Type.String() == box.TypeMdat {
 		h.Mdat = b.(*mdat.Box)
+	} else if bh.Type.String() == box.TypeMoov {
+		h.Moov = b.(*moov.Box)
 	}
 
 	return b, nil
