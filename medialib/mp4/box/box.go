@@ -9,19 +9,13 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
-// Box types
-const (
-	TypeFtyp = "ftyp"
-	TypeFree = "free"
-	TypeSkip = "skip"
-	TypeMdat = "mdat"
-	TypeMoov = "moov"
-
-	TypeUUID = "uuid"
-)
-
-// FixedArray4Bytes represents 4 bytes array.
+// FixedArray4Bytes represents 4 bytes array, mostly used for box type.
 type FixedArray4Bytes [4]byte
+
+// String serializes FixedArray4Bytes.
+func (f FixedArray4Bytes) String() string {
+	return string(f[:])
+}
 
 // Header represents box header structure.
 type Header struct {
@@ -31,22 +25,33 @@ type Header struct {
 	UserType  [16]uint8
 
 	// internal fields
-	payloadSize uint64
+	payloadSize uint64 // includes full box additional version and flags if exist
 }
 
-// String serializes FixedArray4Bytes.
-func (f FixedArray4Bytes) String() string {
-	return string(f[:])
+// FullHeader represents full box header structure.
+type FullHeader struct {
+	Header
+
+	Version uint8
+	Flags   int32 // 24bits
 }
 
 // String serializes Header.
 func (h Header) String() string {
-	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s payloadSize:%d", h.Size, string(h.Type[:]), h.LargeSize, (h.UserType[:]), h.payloadSize)
+	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s payloadSize:%d", h.Size, h.Type[:], h.LargeSize, (h.UserType[:]), h.payloadSize)
 }
 
 // PayloadSize returns payload size, 0 means continue to the end.
 func (h Header) PayloadSize() uint64 {
 	return h.payloadSize
+}
+
+// Size returns total box bytes.
+func (h Header) BoxSize() uint64 {
+	if h.Size == 1 {
+		return h.LargeSize
+	}
+	return uint64(h.Size)
 }
 
 // Parse parses basic box contents.
@@ -89,21 +94,46 @@ func (h *Header) Parse(r io.Reader) error {
 		parsedBytes += 16
 	}
 
-	// if b.Size == 0 || b.Size > parsedBytes || b.LargeSize > uint64(parsedBytes) {
-	// 	if err := util.ReadOrError(r, data); err != nil {
-	// 		return err
-	// 	} else {
-	// 		b.Version = data[0]
-	// 		copy(b.Flags[:], data[1:])
-	// 		parsedBytes += 4
-	// 	}
-	// }
-
 	if h.Size == 1 {
 		h.payloadSize = uint64(h.LargeSize) - uint64(parsedBytes)
 	} else if h.Size > 1 {
 		h.payloadSize = uint64(h.Size) - uint64(parsedBytes)
 	}
 
+	return nil
+}
+
+// Validate validates box header.
+func (h *Header) Validate() error {
+	if !IsValidBoxType(string(h.Type[:])) {
+		return fmt.Errorf("invalid box type %s", h.Type)
+	}
+	return nil
+}
+
+// String serializes Header.
+func (h FullHeader) String() string {
+	return fmt.Sprintf("Header:{%v} Version:%d Flags:%x",
+		h.Header, h.Version, h.Flags)
+}
+
+// ParseVersionFlag assumes Header has been prepared already,
+// 	and try to parse additional `version` and `flag`.`
+// Be aware that it will decrease `PayloadSize` after succeed.
+func (f *FullHeader) ParseVersionFlag(r io.Reader) error {
+	if err := f.Header.Validate(); err != nil {
+		return err
+	}
+
+	data := make([]byte, 1)
+	if err := util.ReadOrError(r, data); err != nil {
+		return err
+	} else {
+		f.Version = data[0]
+		f.Flags = int32(binary.BigEndian.Uint32(data[1:]))
+	}
+
+	// minus used bytes for accurate payload size
+	f.payloadSize -= 1
 	return nil
 }
