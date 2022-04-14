@@ -38,30 +38,32 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	var parsedBytes uint32
 	payloadSize := b.PayloadSize()
 
-	if payloadSize > 0 {
-		if err := util.ReadOrError(r, b.MajorBrand[:]); err != nil {
+	if err := util.ReadOrError(r, b.MajorBrand[:]); err != nil {
+		return err
+	} else {
+		parsedBytes += 4
+	}
+
+	minorVersionData := make([]byte, 4)
+	if err := util.ReadOrError(r, minorVersionData); err != nil {
+		return err
+	} else {
+		b.MinorVersion = binary.BigEndian.Uint32(minorVersionData)
+		parsedBytes += 4
+	}
+
+	for parsedBytes < uint32(payloadSize) {
+		var data [4]byte
+		if err := util.ReadOrError(r, data[:]); err != nil {
 			return err
 		} else {
+			b.CompatibleBrands = append(b.CompatibleBrands, data)
 			parsedBytes += 4
 		}
+	}
 
-		minorVersionData := make([]byte, 4)
-		if err := util.ReadOrError(r, minorVersionData); err != nil {
-			return err
-		} else {
-			b.MinorVersion = binary.BigEndian.Uint32(minorVersionData)
-			parsedBytes += 4
-		}
-
-		for parsedBytes < uint32(payloadSize) {
-			var data [4]byte
-			if err := util.ReadOrError(r, data[:]); err != nil {
-				return err
-			} else {
-				b.CompatibleBrands = append(b.CompatibleBrands, data)
-				parsedBytes += 4
-			}
-		}
+	if parsedBytes != uint32(payloadSize) {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, payloadSize)
 	}
 
 	return nil

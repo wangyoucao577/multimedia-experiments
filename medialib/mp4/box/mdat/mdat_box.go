@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
@@ -35,9 +34,8 @@ func (b *Box) ParsePayload(r io.Reader) error {
 
 	payloadSize := b.PayloadSize()
 
-	if payloadSize <= 0 {
-		glog.Warning("no payload in mdat box")
-		return nil
+	if payloadSize == 0 {
+		return fmt.Errorf("box %s is empty", b.Type)
 	}
 
 	b.Data = make([]byte, payloadSize)
