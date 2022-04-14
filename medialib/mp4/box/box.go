@@ -14,6 +14,7 @@ const (
 	TypeFtyp = "ftyp"
 	TypeFree = "free"
 	TypeSkip = "skip"
+	TypeMdat = "mdat"
 
 	TypeUUID = "uuid"
 )
