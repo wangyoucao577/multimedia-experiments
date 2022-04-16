@@ -48,14 +48,15 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 		glog.Fatalf("create box type %s failed", h.Type.String())
 	}
 
-	if h.Type.String() == box.TypeFtyp {
+	switch h.Type.String() {
+	case box.TypeFtyp:
 		b.Ftyp = createdBox.(*ftyp.Box)
-	} else if h.Type.String() == box.TypeFree || h.Type.String() == box.TypeSkip {
+	case box.TypeFree, box.TypeSkip:
 		b.Free = append(b.Free, *createdBox.(*free.Box))
 		createdBox = &b.Free[len(b.Free)-1] // reference to the last empty free box
-	} else if h.Type.String() == box.TypeMdat {
+	case box.TypeMdat:
 		b.Mdat = createdBox.(*mdat.Box)
-	} else if h.Type.String() == box.TypeMoov {
+	case box.TypeMoov:
 		b.Moov = createdBox.(*moov.Box)
 	}
 

@@ -46,13 +46,12 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		glog.Fatalf("create box type %s failed", h.Type.String())
 	}
 
-	if h.Type.String() == box.TypeCprt {
+	switch h.Type.String() {
+	case box.TypeCprt:
 		b.Cprt = createdBox.(*cprt.Box)
-	} else if h.Type.String() == box.TypeMeta {
+	case box.TypeMeta:
 		b.Meta = createdBox.(*meta.Box)
 	}
-	//TODO: other types
-
 	return createdBox, nil
 }
 
