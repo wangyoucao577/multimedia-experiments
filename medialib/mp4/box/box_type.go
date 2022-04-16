@@ -13,6 +13,7 @@ const (
 	TypeUdta = "udta"
 	TypeCprt = "cprt"
 	TypeMeta = "meta"
+	TypeHdlr = "hdlr"
 )
 
 var boxTypes = map[string]struct{}{
@@ -27,6 +28,7 @@ var boxTypes = map[string]struct{}{
 	TypeUdta: {},
 	TypeCprt: {},
 	TypeMeta: {},
+	TypeHdlr: {},
 }
 
 // BoxTypes returns box types map.

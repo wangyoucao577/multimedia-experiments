@@ -7,11 +7,16 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta/meta/hdlr"
 )
 
 // Box represents a meta box.
 type Box struct {
 	box.FullHeader
+
+	Hdlr *hdlr.Box
+
+	boxesCreator map[string]box.NewFunc
 }
 
 // New creates a new Box.
@@ -20,12 +25,36 @@ func New(h box.Header) box.Box {
 		FullHeader: box.FullHeader{
 			Header: h,
 		},
+
+		boxesCreator: map[string]box.NewFunc{
+			box.TypeHdlr: hdlr.New,
+		},
 	}
+}
+
+// CreateSubBox tries to create sub level box.
+func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
+	creator, ok := b.boxesCreator[h.Type.String()]
+	if !ok {
+		glog.V(2).Infof("unknown box type %s, size %d payload %d", h.Type.String(), h.Size, h.PayloadSize())
+		return nil, box.ErrUnknownBoxType
+	}
+
+	createdBox := creator(h)
+	if createdBox == nil {
+		glog.Fatalf("create box type %s failed", h.Type.String())
+	}
+
+	switch h.Type.String() {
+	case box.TypeHdlr:
+		b.Hdlr = createdBox.(*hdlr.Box)
+	}
+	return createdBox, nil
 }
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v}", b.FullHeader)
+	return fmt.Sprintf("FullHeader:{%v} hdlr:{%v}", b.FullHeader, b.Hdlr)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -40,10 +69,23 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if _, e := r.Read(make([]byte, b.PayloadSize())); e != nil {
-		return fmt.Errorf("parse box %s read %d bytes failed, err %v", b.Type, b.PayloadSize(), e)
+	var parsedBytes uint64
+	for {
+		boxHeader, err := box.ParseBox(r, b)
+		if err != nil {
+			if err == io.EOF {
+				return err
+			} else if err == box.ErrUnknownBoxType {
+				// after ignore the box, continue to parse next
+			} else {
+				return err
+			}
+		}
+		parsedBytes += boxHeader.BoxSize()
+
+		if parsedBytes == b.PayloadSize() {
+			break
+		}
 	}
 
 	return nil
