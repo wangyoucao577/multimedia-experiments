@@ -9,8 +9,8 @@ const (
 	TypeSkip = "skip"
 	TypeMdat = "mdat"
 	TypeMoov = "moov"
-	TypeMvhd = "mvhd" // in `moov`
-
+	TypeMvhd = "mvhd"
+	TypeUdta = "udta"
 )
 
 var boxTypes = map[string]struct{}{

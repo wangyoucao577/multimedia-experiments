@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/mvhd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta"
 )
 
 // Box represents a mdat box.
@@ -15,6 +16,7 @@ type Box struct {
 	box.Header
 
 	Mvhd *mvhd.Box
+	Udta *udta.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -26,6 +28,7 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeMvhd: mvhd.New,
+			box.TypeUdta: udta.New,
 		},
 	}
 }
@@ -45,20 +48,17 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 
 	if h.Type.String() == box.TypeMvhd {
 		b.Mvhd = createdBox.(*mvhd.Box)
+	} else if h.Type.String() == box.TypeUdta {
+		b.Udta = createdBox.(*udta.Box)
 	}
 	//TODO: other types
 
 	return createdBox, nil
 }
 
-// GetHeader return header of the box.
-func (b Box) GetHeader() box.Header {
-	return b.Header
-}
-
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} mvhd:{%v}", b.Header, b.Mvhd)
+	return fmt.Sprintf("Header:{%v} mvhd:{%v} udta:{%v}", b.Header, b.Mvhd, b.Udta)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
