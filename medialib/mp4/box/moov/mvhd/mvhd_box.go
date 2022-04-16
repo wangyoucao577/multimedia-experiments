@@ -8,6 +8,7 @@ import (
 
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/time1904"
 )
 
 // Box represents a ftyp box.
@@ -38,8 +39,8 @@ func New(h box.Header) box.Box {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d ModificationTime:%d Timescale:%d Duration:%d Rate:0x%x Volume:0x%x Matrix:%v, PreDefined:%v NextTrackID:%d",
-		b.FullHeader, b.CreationTime, b.ModificationTime, b.Timescale, b.Duration, b.Rate, b.Volume, b.Matrix, b.PreDefined, b.NextTrackID)
+	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) Timescale:%d Duration:%d(%.3fs) Rate:0x%x Volume:0x%x Matrix:%v, PreDefined:%v NextTrackID:%d",
+		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.Timescale, b.Duration, float64(b.Duration)/float64(b.Timescale), b.Rate, b.Volume, b.Matrix, b.PreDefined, b.NextTrackID)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
