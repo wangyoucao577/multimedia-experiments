@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mvhd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/trak"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/udta"
 )
 
@@ -17,6 +18,7 @@ type Box struct {
 
 	Mvhd *mvhd.Box
 	Udta *udta.Box
+	Trak *trak.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -29,6 +31,7 @@ func New(h box.Header) box.Box {
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeMvhd: mvhd.New,
 			box.TypeUdta: udta.New,
+			box.TypeTrak: trak.New,
 		},
 	}
 }
@@ -51,6 +54,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Mvhd = createdBox.(*mvhd.Box)
 	case box.TypeUdta:
 		b.Udta = createdBox.(*udta.Box)
+	case box.TypeTrak:
+		b.Trak = createdBox.(*trak.Box)
 	}
 
 	return createdBox, nil

@@ -1,4 +1,4 @@
-// Package hdlr represents copy right boxes which may has type `hdlr`.
+// Package hdlr represents hdlr type box.
 package hdlr
 
 import (

@@ -1,5 +1,5 @@
-// Package ilst represents ilst type box.
-package ilst
+// Package trak represents trak type box.
+package trak
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
-// Box represents a ilst box.
+// Box represents a trak box.
 type Box struct {
 	box.FullHeader
 }
