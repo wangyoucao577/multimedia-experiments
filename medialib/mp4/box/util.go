@@ -1,10 +1,10 @@
 package box
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
 // ParseBox tries to parse a box from a mount of data.
@@ -27,8 +27,8 @@ func ParseBox(r io.Reader, pb ParentBox) (*Header, error) {
 
 		// read and ignore
 		//TODO: support seek
-		if _, e := r.Read(make([]byte, boxHeader.PayloadSize())); e != nil {
-			return &boxHeader, fmt.Errorf("parse box %s read %d bytes failed, err %v", boxHeader.Type, boxHeader.PayloadSize(), e)
+		if err := util.ReadOrError(r, make([]byte, boxHeader.PayloadSize())); err != nil {
+			return &boxHeader, err
 		}
 		return &boxHeader, err
 	}
