@@ -1,5 +1,5 @@
-// Package udta represents user data boxes which may has type `udta`.
-package udta
+// Package meta represents copy right boxes which may has type `meta`.
+package meta
 
 import (
 	"fmt"
@@ -7,16 +7,16 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta/cprt"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta/meta"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/ilst"
 )
 
-// Box represents a udta box.
+// Box represents a meta box.
 type Box struct {
-	box.Header
+	box.FullHeader
 
-	Cprt *cprt.Box
-	Meta *meta.Box
+	Hdlr *hdlr.Box
+	Ilst *ilst.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -24,11 +24,13 @@ type Box struct {
 // New creates a new Box.
 func New(h box.Header) box.Box {
 	return &Box{
-		Header: h,
+		FullHeader: box.FullHeader{
+			Header: h,
+		},
 
 		boxesCreator: map[string]box.NewFunc{
-			box.TypeCprt: cprt.New,
-			box.TypeMeta: meta.New,
+			box.TypeHdlr: hdlr.New,
+			box.TypeIlst: ilst.New,
 		},
 	}
 }
@@ -47,17 +49,17 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	switch h.Type.String() {
-	case box.TypeCprt:
-		b.Cprt = createdBox.(*cprt.Box)
-	case box.TypeMeta:
-		b.Meta = createdBox.(*meta.Box)
+	case box.TypeHdlr:
+		b.Hdlr = createdBox.(*hdlr.Box)
+	case box.TypeIlst:
+		b.Ilst = createdBox.(*ilst.Box)
 	}
 	return createdBox, nil
 }
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} Cprt:{%v} Meta:{%v}", b.Header, b.Cprt, b.Meta)
+	return fmt.Sprintf("FullHeader:{%v} hdlr:{%v}", b.FullHeader, b.Hdlr)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -65,6 +67,11 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	if b.PayloadSize() == 0 {
 		glog.Warningf("box %s is empty", b.Type)
 		return nil
+	}
+
+	// parse full header additional information first
+	if err := b.FullHeader.ParseVersionFlag(r); err != nil {
+		return err
 	}
 
 	var parsedBytes uint64

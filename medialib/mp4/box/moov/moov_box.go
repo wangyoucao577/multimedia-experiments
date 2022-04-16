@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/mvhd"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mvhd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/udta"
 )
 
 // Box represents a mdat box.
