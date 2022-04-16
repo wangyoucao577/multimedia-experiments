@@ -5,21 +5,50 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/mvhd"
 )
 
 // Box represents a mdat box.
 type Box struct {
 	box.Header
 
-	//TODO:
+	Mvhd *mvhd.Box
+
+	boxesCreator map[string]box.NewFunc
 }
 
 // New creates a new Box.
 func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
+
+		boxesCreator: map[string]box.NewFunc{
+			box.TypeMvhd: mvhd.New,
+		},
 	}
+}
+
+// CreateSubBox tries to create sub level box.
+func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
+	creator, ok := b.boxesCreator[h.Type.String()]
+	if !ok {
+		glog.V(2).Infof("unknown box type %s, size %d payload %d", h.Type.String(), h.Size, h.PayloadSize())
+		return nil, box.ErrUnknownBoxType
+	}
+
+	createdBox := creator(h)
+	if createdBox == nil {
+		glog.Fatalf("create box type %s failed", h.Type.String())
+	}
+
+	if h.Type.String() == box.TypeMvhd {
+		b.Mvhd = createdBox.(*mvhd.Box)
+	}
+	//TODO: other types
+
+	return createdBox, nil
 }
 
 // GetHeader return header of the box.
@@ -29,7 +58,7 @@ func (b Box) GetHeader() box.Header {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v}", b.Header)
+	return fmt.Sprintf("Header:{%v} mvhd:{%v}", b.Header, b.Mvhd)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -61,10 +90,4 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	}
 
 	return nil
-}
-
-// CreateSubBox tries to create sub level box.
-func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
-	//TODO:
-	return nil, box.ErrUnknownBoxType
 }

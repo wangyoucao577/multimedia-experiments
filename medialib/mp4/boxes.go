@@ -39,7 +39,7 @@ func newBoxes() Boxes {
 func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 	creator, ok := b.boxesCreator[h.Type.String()]
 	if !ok {
-		glog.Warningf("unknown box type %s, size %d payload %d", h.Type.String(), h.Size, h.PayloadSize())
+		glog.V(2).Infof("unknown box type %s, size %d payload %d", h.Type.String(), h.Size, h.PayloadSize())
 		return nil, box.ErrUnknownBoxType
 	}
 

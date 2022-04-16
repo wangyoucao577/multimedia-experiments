@@ -33,7 +33,7 @@ type FullHeader struct {
 	Header
 
 	Version uint8
-	Flags   int32 // 24bits
+	Flags   uint32 // 24bits
 }
 
 // String serializes Header.
@@ -125,15 +125,15 @@ func (f *FullHeader) ParseVersionFlag(r io.Reader) error {
 		return err
 	}
 
-	data := make([]byte, 1)
+	data := make([]byte, 4)
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
 		f.Version = data[0]
-		f.Flags = int32(binary.BigEndian.Uint32(data[1:]))
+		f.Flags = binary.BigEndian.Uint32(data)
 	}
 
 	// minus used bytes for accurate payload size
-	f.payloadSize -= 1
+	f.payloadSize -= 4
 	return nil
 }
