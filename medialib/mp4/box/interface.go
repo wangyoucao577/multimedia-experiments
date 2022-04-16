@@ -26,6 +26,6 @@ type Box interface {
 // ParentBox defines functions if a box possible to have sub/child box.
 type ParentBox interface {
 	// CreateSubBox creates directly included box, such as create `mvhd` in `moov`, or create `moov` on top level.
-	//   return errNotImplemented is the box doesn't have any sub box.
+	//   return ErrNotImplemented is the box doesn't have any sub box.
 	CreateSubBox(Header) (Box, error)
 }

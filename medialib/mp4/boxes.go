@@ -34,6 +34,8 @@ func newBoxes() Boxes {
 	}
 }
 
+// CreateSubBox creates directly included box, such as create `mvhd` in `moov`, or create `moov` on top level.
+//   return ErrNotImplemented is the box doesn't have any sub box.
 func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 	creator, ok := b.boxesCreator[h.Type.String()]
 	if !ok {
