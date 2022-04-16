@@ -11,6 +11,8 @@ const (
 	TypeMoov = "moov"
 	TypeMvhd = "mvhd"
 	TypeUdta = "udta"
+	TypeCprt = "cprt"
+	TypeMeta = "meta"
 )
 
 var boxTypes = map[string]struct{}{
@@ -22,6 +24,9 @@ var boxTypes = map[string]struct{}{
 	TypeMdat: {},
 	TypeMoov: {},
 	TypeMvhd: {},
+	TypeUdta: {},
+	TypeCprt: {},
+	TypeMeta: {},
 }
 
 // BoxTypes returns box types map.
