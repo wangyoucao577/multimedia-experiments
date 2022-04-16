@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta/meta/hdlr"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov/udta/meta/ilst"
 )
 
 // Box represents a meta box.
@@ -15,6 +16,7 @@ type Box struct {
 	box.FullHeader
 
 	Hdlr *hdlr.Box
+	Ilst *ilst.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -28,6 +30,7 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeHdlr: hdlr.New,
+			box.TypeIlst: ilst.New,
 		},
 	}
 }
@@ -48,6 +51,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeHdlr:
 		b.Hdlr = createdBox.(*hdlr.Box)
+	case box.TypeIlst:
+		b.Ilst = createdBox.(*ilst.Box)
 	}
 	return createdBox, nil
 }
