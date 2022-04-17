@@ -1,31 +1,34 @@
-// Package mvhd defines mvhd box structure.
-package mvhd
+// Package tkhd represents tkhd type box.
+package tkhd
 
 import (
 	"encoding/binary"
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/time1904"
 )
 
-// Box represents a ftyp box.
+// Box represents a tkhd box.
 type Box struct {
 	box.FullHeader
 
 	CreationTime     uint64
 	ModificationTime uint64
-	Timescale        uint32
-	Duration         uint64
-
-	Rate   int32
-	Volume int16
-	// reserved 16 + 2*32 = 80 bits in here
-	Matrix      [9]int32
-	PreDefined  [6]uint32
-	NextTrackID uint32
+	// reserved 4 byes here
+	TrackID  uint32
+	Duration uint64
+	// reserved 4*2 bytes here
+	Layer            int16
+	AlternativeGroup int16
+	Volume           int16
+	// reserved 2 bytes here
+	Matrix [9]int32
+	Width  uint32
+	Height uint32
 }
 
 // New creates a new Box.
@@ -39,12 +42,16 @@ func New(h box.Header) box.Box {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) Timescale:%d Duration:%d(%.3fs) Rate:0x%x Volume:0x%x Matrix:%v, PreDefined:%v NextTrackID:%d",
-		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.Timescale, b.Duration, float64(b.Duration)/float64(b.Timescale), b.Rate, b.Volume, b.Matrix, b.PreDefined, b.NextTrackID)
+	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) TrackID:%d Duration:%d Layer:0x%x AlternativeGroup 0x%x Volume:0x%x Matrix:%v, Width:%v Height:%d",
+		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.TrackID, b.Duration, b.Layer, b.AlternativeGroup, b.Volume, b.Matrix, b.Width, b.Height)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
 func (b *Box) ParsePayload(r io.Reader) error {
+	if b.PayloadSize() == 0 {
+		glog.Warningf("box %s is empty", b.Type)
+		return nil
+	}
 
 	// parse full header additional information first
 	if err := b.FullHeader.ParseVersionFlag(r); err != nil {
@@ -86,7 +93,14 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	if err := util.ReadOrError(r, data[:4]); err != nil {
 		return err
 	} else {
-		b.Timescale = binary.BigEndian.Uint32(data[:4])
+		b.TrackID = binary.BigEndian.Uint32(data[:4])
+		parsedBytes += 4
+	}
+
+	// ignore reserved 4 bytes in here
+	if err := util.ReadOrError(r, data[:4]); err != nil {
+		return err
+	} else {
 		parsedBytes += 4
 	}
 
@@ -101,11 +115,25 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		parsedBytes += uint64(timeDataSize)
 	}
 
-	if err := util.ReadOrError(r, data[:4]); err != nil {
+	// ignore reserved 4*2 bytes in here
+	if err := util.ReadOrError(r, make([]byte, 8)); err != nil {
 		return err
 	} else {
-		b.Rate = int32(binary.BigEndian.Uint32(data[:4]))
-		parsedBytes += 4
+		parsedBytes += 8
+	}
+
+	if err := util.ReadOrError(r, data[:2]); err != nil {
+		return err
+	} else {
+		b.Layer = int16(binary.BigEndian.Uint16(data[:2]))
+		parsedBytes += 2
+	}
+
+	if err := util.ReadOrError(r, data[:2]); err != nil {
+		return err
+	} else {
+		b.AlternativeGroup = int16(binary.BigEndian.Uint16(data[:2]))
+		parsedBytes += 2
 	}
 
 	if err := util.ReadOrError(r, data[:2]); err != nil {
@@ -115,11 +143,11 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		parsedBytes += 2
 	}
 
-	// ignore reserved 16 + 2*32 = 80 bits in here
-	if err := util.ReadOrError(r, make([]byte, 10)); err != nil {
+	// ignore reserved 2 bytes in here
+	if err := util.ReadOrError(r, data[:2]); err != nil {
 		return err
 	} else {
-		parsedBytes += 10
+		parsedBytes += 2
 	}
 
 	data = data[:4] // shrink to 4 bytes
@@ -132,19 +160,17 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		}
 	}
 
-	for i := 0; i < len(b.PreDefined); i++ {
-		if err := util.ReadOrError(r, data); err != nil {
-			return err
-		} else {
-			b.PreDefined[i] = binary.BigEndian.Uint32(data)
-			parsedBytes += 4
-		}
+	if err := util.ReadOrError(r, data); err != nil {
+		return err
+	} else {
+		b.Width = binary.BigEndian.Uint32(data)
+		parsedBytes += 4
 	}
 
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
-		b.NextTrackID = binary.BigEndian.Uint32(data)
+		b.Height = binary.BigEndian.Uint32(data)
 		parsedBytes += 4
 	}
 

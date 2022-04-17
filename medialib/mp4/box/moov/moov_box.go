@@ -18,7 +18,7 @@ type Box struct {
 
 	Mvhd *mvhd.Box
 	Udta *udta.Box
-	Trak *trak.Box
+	Trak []trak.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -55,7 +55,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	case box.TypeUdta:
 		b.Udta = createdBox.(*udta.Box)
 	case box.TypeTrak:
-		b.Trak = createdBox.(*trak.Box)
+		b.Trak = append(b.Trak, *createdBox.(*trak.Box))
+		createdBox = &b.Trak[len(b.Trak)-1] // reference to the last empty free box
 	}
 
 	return createdBox, nil
@@ -63,7 +64,7 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} mvhd:{%v} udta:{%v}", b.Header, b.Mvhd, b.Udta)
+	return fmt.Sprintf("Header:{%v} mvhd:{%v} udta:{%v} Trak:{%v}", b.Header, b.Mvhd, b.Udta, b.Trak)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
