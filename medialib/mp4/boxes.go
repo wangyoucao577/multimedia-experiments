@@ -41,9 +41,21 @@ func (b Boxes) Marshal() ([]byte, error) {
 	return json.Marshal(b)
 }
 
+// Marshal formats boxes to JSON representation with customized indent.
+func (b Boxes) MarshalIndent(prefix, indent string) ([]byte, error) {
+	return json.MarshalIndent(b, prefix, indent)
+}
+
 // Marshal formats boxes to JSON representation stored in string.
-func (b Boxes) MarshalString() (string, error) {
-	d, err := json.Marshal(b)
+func (b Boxes) MarshalString(lineEnding bool) (string, error) {
+	var d []byte
+	var err error
+
+	if lineEnding {
+		d, err = json.MarshalIndent(b, "", "\t")
+	} else {
+		d, err = json.Marshal(b)
+	}
 	return string(d), err
 }
 

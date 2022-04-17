@@ -27,7 +27,7 @@ func main() {
 		}
 	}
 
-	if d, err := m.Boxes.MarshalString(); err != nil {
+	if d, err := m.Boxes.MarshalString(false); err != nil {
 		glog.Error(err)
 	} else {
 		fmt.Println(d)
