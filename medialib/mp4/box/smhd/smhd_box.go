@@ -2,6 +2,7 @@
 package smhd
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 
@@ -13,6 +14,8 @@ import (
 // Box represents a smhd box.
 type Box struct {
 	box.FullHeader
+
+	Balance int16
 }
 
 // New creates a new Box.
@@ -26,7 +29,7 @@ func New(h box.Header) box.Box {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v}", b.FullHeader)
+	return fmt.Sprintf("FullHeader:{%v} Balance:{%v}", b.FullHeader, b.Balance)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -41,10 +44,24 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+	var parsedBytes uint64
+	data := make([]byte, 2)
+	if err := util.ReadOrError(r, data); err != nil {
 		return err
+	} else {
+		b.Balance = int16(binary.BigEndian.Uint16(data))
+		parsedBytes += 2
+	}
+
+	// ignore reserved 2 bytes
+	if err := util.ReadOrError(r, make([]byte, 2)); err != nil {
+		return err
+	} else {
+		parsedBytes += 2
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
