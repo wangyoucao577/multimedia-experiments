@@ -12,12 +12,12 @@ import (
 
 // Box represents a hdlr box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	Predefined  uint32
-	HandlerType uint32
+	Predefined  uint32               `json:"pre_defined"`
+	HandlerType box.FixedArray4Bytes `json:"handler_type"`
 	// reserved 32 * 3 = 96 bits
-	Name string
+	Name string `json:"name"`
 }
 
 // New creates a new Box.
@@ -27,12 +27,6 @@ func New(h box.Header) box.Box {
 			Header: h,
 		},
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} Predefined:{%v} HandlerType:{%v} Name:{%s}",
-		b.FullHeader, b.Predefined, b.HandlerType, b.Name)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -56,10 +50,9 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		parsedBytes += 4
 	}
 
-	if err := util.ReadOrError(r, data); err != nil {
+	if err := util.ReadOrError(r, b.HandlerType[:]); err != nil {
 		return err
 	} else {
-		b.HandlerType = binary.BigEndian.Uint32(data)
 		parsedBytes += 4
 	}
 

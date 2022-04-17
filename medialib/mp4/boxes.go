@@ -1,6 +1,8 @@
 package mp4
 
 import (
+	"encoding/json"
+
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/free"
@@ -11,15 +13,15 @@ import (
 
 // Boxes represents mp4 boxes.
 type Boxes struct {
-	Ftyp *ftyp.Box
-	Free []free.Box
-	Mdat *mdat.Box
-	Moov *moov.Box
+	Ftyp *ftyp.Box  `json:"ftyp,omitempty"`
+	Free []free.Box `json:"free,omitempty"`
+	Mdat *mdat.Box  `json:"mdat,omitempty"`
+	Moov *moov.Box  `json:"moov,omitempty"`
 
 	//TODO: other boxes
 
 	// internal vars for parsing or other handling
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 func newBoxes() Boxes {
@@ -32,6 +34,17 @@ func newBoxes() Boxes {
 			box.TypeMoov: moov.New,
 		},
 	}
+}
+
+// Marshal formats boxes to JSON representation.
+func (b Boxes) Marshal() ([]byte, error) {
+	return json.Marshal(b)
+}
+
+// Marshal formats boxes to JSON representation stored in string.
+func (b Boxes) MarshalString() (string, error) {
+	d, err := json.Marshal(b)
+	return string(d), err
 }
 
 // CreateSubBox creates directly included box, such as create `mvhd` in `moov`, or create `moov` on top level.

@@ -12,11 +12,11 @@ import (
 
 // Box represents a ftyp box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	MajorBrand       box.FixedArray4Bytes
-	MinorVersion     uint32
-	CompatibleBrands []box.FixedArray4Bytes
+	MajorBrand       box.FixedArray4Bytes   `json:"major_brand"`
+	MinorVersion     uint32                 `json:"minor_version"`
+	CompatibleBrands []box.FixedArray4Bytes `json:"compatible_brands"`
 }
 
 // New creates a new Box.
@@ -24,12 +24,6 @@ func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} MajorBrand:%s MinorVersion:%d CompatibleBrands:%v",
-		b.Header, string(b.MajorBrand[:]), b.MinorVersion, b.CompatibleBrands)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

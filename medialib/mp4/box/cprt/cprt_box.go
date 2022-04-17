@@ -2,7 +2,6 @@
 package cprt
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,11 +11,11 @@ import (
 
 // Box represents a cprt box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	Pad      uint8    // 1 bit
-	Language [3]uint8 // 5 bytes per uint
-	Notice   string
+	Pad      uint8    `json:"pad"`      // 1 bit
+	Language [3]uint8 `json:"language"` // 5 bytes per uint
+	Notice   string   `json:"notice"`
 }
 
 // New creates a new Box.
@@ -26,11 +25,6 @@ func New(h box.Header) box.Box {
 			Header: h,
 		},
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v}", b.FullHeader)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

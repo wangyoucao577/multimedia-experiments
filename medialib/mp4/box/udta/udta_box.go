@@ -2,7 +2,6 @@
 package udta
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -13,12 +12,12 @@ import (
 
 // Box represents a udta box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Cprt *cprt.Box
-	Meta *meta.Box
+	Cprt *cprt.Box `json:"cprt,omitempty"`
+	Meta *meta.Box `json:"meta,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -53,11 +52,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Meta = createdBox.(*meta.Box)
 	}
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} Cprt:{%v} Meta:{%v}", b.Header, b.Cprt, b.Meta)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

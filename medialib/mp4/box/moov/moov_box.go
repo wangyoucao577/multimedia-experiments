@@ -14,13 +14,13 @@ import (
 
 // Box represents a mdat box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Mvhd *mvhd.Box
-	Udta *udta.Box
-	Trak []trak.Box
+	Mvhd *mvhd.Box  `json:"mvhd,omitempty"`
+	Udta *udta.Box  `json:"udta,omitempty"`
+	Trak []trak.Box `json:"trak,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -60,11 +60,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} mvhd:{%v} udta:{%v} Trak:{%v}", b.Header, b.Mvhd, b.Udta, b.Trak)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

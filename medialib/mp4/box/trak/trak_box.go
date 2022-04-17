@@ -2,7 +2,6 @@
 package trak
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -13,12 +12,12 @@ import (
 
 // Box represents a trak box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	Tkhd *tkhd.Box
-	Mdia *mdia.Box
+	Tkhd *tkhd.Box `json:"tkhd,omitempty"`
+	Mdia *mdia.Box `json:"mdia,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -56,11 +55,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} Tkhd:{%v} Mdia:{%v}", b.FullHeader, b.Tkhd, b.Mdia)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

@@ -3,8 +3,10 @@ package mdhd
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
@@ -14,16 +16,16 @@ import (
 
 // Box represents a mdhd box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	CreationTime     uint64
-	ModificationTime uint64
-	Timescale        uint32
-	Duration         uint64
+	CreationTime     uint64 `json:"creation_time,string"`
+	ModificationTime uint64 `json:"modification_time,string"`
+	Timescale        uint32 `json:"timescale"`
+	Duration         uint64 `json:"duration"`
 
-	Pad        uint8    // 1 bit
-	Language   [3]uint8 // 5 bytes per uint
-	Predefined uint16
+	Pad        uint8    `json:"pad"`      // 1 bit
+	Language   [3]uint8 `json:"language"` // 5 bytes per uint
+	Predefined uint16   `json:"pre_defined"`
 }
 
 // New creates a new Box.
@@ -35,10 +37,35 @@ func New(h box.Header) box.Box {
 	}
 }
 
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) Timescale:%d Duration:%d(%.3fs) Pad:%d Language:%v, PreDefined:%d",
-		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.Timescale, b.Duration, float64(b.Duration)/float64(b.Timescale), b.Pad, b.Language, b.Predefined)
+// MarshalJSON implements json.Marshaler interface.
+func (b Box) MarshalJSON() ([]byte, error) {
+	jsonBox := struct {
+		box.FullHeader `json:"full_header"`
+
+		CreationTime         time.Time `json:"creation_time"`
+		ModificationTime     time.Time `json:"modification_time"`
+		Timescale            uint32    `json:"timescale"`
+		Duration             uint64    `json:"duration"`
+		DurationMilliSeconds uint64    `json:"duration_ms"`
+
+		Pad        uint8    `json:"pad"`      // 1 bit
+		Language   [3]uint8 `json:"language"` // 5 bytes per uint
+		Predefined uint16   `json:"pre_defined"`
+	}{
+		FullHeader: b.FullHeader,
+
+		CreationTime:         time1904.Unix(int64(b.CreationTime), 0).UTC(),
+		ModificationTime:     time1904.Unix(int64(b.ModificationTime), 0).UTC(),
+		Timescale:            b.Timescale,
+		Duration:             b.Duration,
+		DurationMilliSeconds: uint64(float64(b.Duration) * 1000 / float64(b.Timescale)),
+
+		Pad:        b.Pad,
+		Language:   b.Language,
+		Predefined: b.Predefined,
+	}
+
+	return json.Marshal(jsonBox)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

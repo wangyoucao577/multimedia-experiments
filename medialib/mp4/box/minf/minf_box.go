@@ -2,7 +2,6 @@
 package minf
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -15,14 +14,14 @@ import (
 
 // Box represents a minf box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Stbl *stbl.Box
-	Dinf *dinf.Box
-	Smhd *smhd.Box
-	Vmhd *vmhd.Box
+	Stbl *stbl.Box `json:"stbl,omitempty"`
+	Dinf *dinf.Box `json:"dinf,omitempty"`
+	Smhd *smhd.Box `json:"smhd,omitempty"`
+	Vmhd *vmhd.Box `json:"vmhd,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -64,11 +63,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} Sbtl:{%v} Dinf:{%v} Smhd:{%v} Vmhd:{%v}", b.Header, b.Stbl, b.Dinf, b.Smhd, b.Vmhd)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

@@ -2,7 +2,6 @@
 package meta
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -13,12 +12,12 @@ import (
 
 // Box represents a meta box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	Hdlr *hdlr.Box
-	Ilst *ilst.Box
+	Hdlr *hdlr.Box `json:"hdlr,omitempty"`
+	Ilst *ilst.Box `json:"ilst,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -55,11 +54,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Ilst = createdBox.(*ilst.Box)
 	}
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} hdlr:{%v}", b.FullHeader, b.Hdlr)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

@@ -3,6 +3,7 @@ package box
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -17,23 +18,28 @@ func (f FixedArray4Bytes) String() string {
 	return string(f[:])
 }
 
+// MarshalJSON implements json.Marshaler interface.
+func (f FixedArray4Bytes) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.String())
+}
+
 // Header represents box header structure.
 type Header struct {
-	Size      uint32
-	Type      FixedArray4Bytes // 32 bits
-	LargeSize uint64
-	UserType  [16]uint8
+	Size      uint32           `json:"size"`
+	Type      FixedArray4Bytes `json:"type"` // 32 bits
+	LargeSize uint64           `json:"large_size,omitempty"`
+	UserType  *[16]uint8       `json:"user_type,omitempty"`
 
 	// internal fields
-	payloadSize uint64 // includes full box additional version and flags if exist
+	payloadSize uint64 `json:"-"` // includes full box additional version and flags if exist
 }
 
 // FullHeader represents full box header structure.
 type FullHeader struct {
-	Header
+	Header `json:"header"`
 
-	Version uint8
-	Flags   uint32 // 24bits
+	Version uint8  `json:"version"`
+	Flags   uint32 `json:"flags"` // 24bits
 }
 
 // String serializes Header.
@@ -88,6 +94,7 @@ func (h *Header) Parse(r io.Reader) error {
 
 	// user type
 	if string(h.Type[:]) == TypeUUID {
+		h.UserType = &[16]uint8{}
 		if err := util.ReadOrError(r, h.UserType[:]); err != nil {
 			return err
 		}

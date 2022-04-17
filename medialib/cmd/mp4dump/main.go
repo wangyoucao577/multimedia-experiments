@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -26,9 +27,9 @@ func main() {
 		}
 	}
 
-	glog.Infof("ftyp{%+v}", m.Boxes.Ftyp)
-	glog.Infof("free{%+v}", m.Boxes.Free)
-	glog.Infof("mdat{%+v}", m.Boxes.Mdat)
-	glog.Infof("moov{%+v}", m.Boxes.Moov)
-
+	if d, err := m.Boxes.MarshalString(); err != nil {
+		glog.Error(err)
+	} else {
+		fmt.Println(d)
+	}
 }

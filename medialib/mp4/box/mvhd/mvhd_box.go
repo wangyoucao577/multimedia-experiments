@@ -3,8 +3,10 @@ package mvhd
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
@@ -13,19 +15,19 @@ import (
 
 // Box represents a ftyp box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	CreationTime     uint64
-	ModificationTime uint64
-	Timescale        uint32
-	Duration         uint64
+	CreationTime     uint64 `json:"creation_time,string"`
+	ModificationTime uint64 `json:"modification_time,string"`
+	Timescale        uint32 `json:"timescale"`
+	Duration         uint64 `json:"duration"`
 
-	Rate   int32
-	Volume int16
+	Rate   int32 `json:"rate"`
+	Volume int16 `json:"volume"`
 	// reserved 16 + 2*32 = 80 bits in here
-	Matrix      [9]int32
-	PreDefined  [6]uint32
-	NextTrackID uint32
+	Matrix      [9]int32  `json:"matrix"`
+	PreDefined  [6]uint32 `json:"pre_defined"`
+	NextTrackID uint32    `json:"next_track_id"`
 }
 
 // New creates a new Box.
@@ -37,10 +39,39 @@ func New(h box.Header) box.Box {
 	}
 }
 
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) Timescale:%d Duration:%d(%.3fs) Rate:0x%x Volume:0x%x Matrix:%v, PreDefined:%v NextTrackID:%d",
-		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.Timescale, b.Duration, float64(b.Duration)/float64(b.Timescale), b.Rate, b.Volume, b.Matrix, b.PreDefined, b.NextTrackID)
+// MarshalJSON implements json.Marshaler interface.
+func (b Box) MarshalJSON() ([]byte, error) {
+	jsonBox := struct {
+		box.FullHeader `json:"full_header"`
+
+		CreationTime         time.Time `json:"creation_time"`
+		ModificationTime     time.Time `json:"modification_time"`
+		Timescale            uint32    `json:"timescale"`
+		Duration             uint64    `json:"duration"`
+		DurationMilliSeconds uint64    `json:"duration_ms"`
+
+		Rate        int32     `json:"rate"`
+		Volume      int16     `json:"volume"`
+		Matrix      [9]int32  `json:"matrix"`
+		PreDefined  [6]uint32 `json:"pre_defined"`
+		NextTrackID uint32    `json:"next_track_id"`
+	}{
+		FullHeader: b.FullHeader,
+
+		CreationTime:         time1904.Unix(int64(b.CreationTime), 0).UTC(),
+		ModificationTime:     time1904.Unix(int64(b.ModificationTime), 0).UTC(),
+		Timescale:            b.Timescale,
+		Duration:             b.Duration,
+		DurationMilliSeconds: uint64(float64(b.Duration) * 1000 / float64(b.Timescale)),
+
+		Rate:        b.Rate,
+		Volume:      b.Volume,
+		Matrix:      b.Matrix,
+		PreDefined:  b.PreDefined,
+		NextTrackID: b.NextTrackID,
+	}
+
+	return json.Marshal(jsonBox)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

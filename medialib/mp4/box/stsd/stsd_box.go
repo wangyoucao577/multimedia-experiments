@@ -2,7 +2,6 @@
 package stsd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,7 +11,7 @@ import (
 
 // Box represents a stsd box.
 type Box struct {
-	box.Header
+	box.Header `json:"full_header"`
 }
 
 // New creates a new Box.
@@ -20,11 +19,6 @@ func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v}", b.Header)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

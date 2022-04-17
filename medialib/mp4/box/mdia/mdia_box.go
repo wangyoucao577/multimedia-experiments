@@ -2,7 +2,6 @@
 package mdia
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -14,13 +13,13 @@ import (
 
 // Box represents a mdia box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Mdhd *mdhd.Box
-	Hdlr *hdlr.Box
-	Minf *minf.Box
+	Mdhd *mdhd.Box `json:"mdhd,omitempty"`
+	Hdlr *hdlr.Box `json:"hdlr,omitempty"`
+	Minf *minf.Box `json:"minf,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -58,11 +57,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Minf = createdBox.(*minf.Box)
 	}
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} mdhd:{%v} Hdlr:{%v} Minf:{%v}", b.Header, b.Mdhd, b.Hdlr, b.Minf)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

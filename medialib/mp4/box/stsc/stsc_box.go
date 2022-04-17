@@ -2,7 +2,6 @@
 package stsc
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,7 +11,7 @@ import (
 
 // Box represents a stsc box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 }
 
 // New creates a new Box.
@@ -22,11 +21,6 @@ func New(h box.Header) box.Box {
 			Header: h,
 		},
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v}", b.FullHeader)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

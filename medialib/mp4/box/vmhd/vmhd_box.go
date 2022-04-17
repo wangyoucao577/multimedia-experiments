@@ -13,10 +13,10 @@ import (
 
 // Box represents a vmhd box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	GraphicsMode uint16
-	OPColor      [3]uint16
+	GraphicsMode uint16    `json:"grapicsmode"`
+	OPColor      [3]uint16 `json:"opcolor"`
 }
 
 // New creates a new Box.
@@ -26,11 +26,6 @@ func New(h box.Header) box.Box {
 			Header: h,
 		},
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} GraphicsMode:{%d} OPColor:{%v}", b.FullHeader, b.GraphicsMode, b.OPColor)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

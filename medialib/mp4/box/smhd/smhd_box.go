@@ -13,9 +13,9 @@ import (
 
 // Box represents a smhd box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	Balance int16
+	Balance int16 `json:"balance"`
 }
 
 // New creates a new Box.
@@ -25,11 +25,6 @@ func New(h box.Header) box.Box {
 			Header: h,
 		},
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} Balance:{%v}", b.FullHeader, b.Balance)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

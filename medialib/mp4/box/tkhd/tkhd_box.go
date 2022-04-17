@@ -3,8 +3,10 @@ package tkhd
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
@@ -14,21 +16,21 @@ import (
 
 // Box represents a tkhd box.
 type Box struct {
-	box.FullHeader
+	box.FullHeader `json:"full_header"`
 
-	CreationTime     uint64
-	ModificationTime uint64
+	CreationTime     uint64 `json:"creation_time,string"`
+	ModificationTime uint64 `json:"modification_time,string"`
 	// reserved 4 byes here
-	TrackID  uint32
-	Duration uint64
+	TrackID  uint32 `json:"track_id"`
+	Duration uint64 `json:"duration"`
 	// reserved 4*2 bytes here
-	Layer            int16
-	AlternativeGroup int16
-	Volume           int16
+	Layer            int16 `json:"layer"`
+	AlternativeGroup int16 `json:"alternative_group"`
+	Volume           int16 `json:"volume"`
 	// reserved 2 bytes here
-	Matrix [9]int32
-	Width  uint32
-	Height uint32
+	Matrix [9]int32 `json:"matrix"`
+	Width  uint32   `json:"width"`
+	Height uint32   `json:"height"`
 }
 
 // New creates a new Box.
@@ -40,10 +42,42 @@ func New(h box.Header) box.Box {
 	}
 }
 
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} CreationTime:%d(%s) ModificationTime:%d(%s) TrackID:%d Duration:%d Layer:0x%x AlternativeGroup 0x%x Volume:0x%x Matrix:%v, Width:%v Height:%d",
-		b.FullHeader, b.CreationTime, time1904.Unix(int64(b.CreationTime), 0).UTC(), b.ModificationTime, time1904.Unix(int64(b.ModificationTime), 0).UTC(), b.TrackID, b.Duration, b.Layer, b.AlternativeGroup, b.Volume, b.Matrix, b.Width, b.Height)
+// MarshalJSON implements json.Marshaler interface.
+func (b Box) MarshalJSON() ([]byte, error) {
+	jsonBox := struct {
+		box.FullHeader `json:"full_header"`
+
+		CreationTime     time.Time `json:"creation_time"`
+		ModificationTime time.Time `json:"modification_time"`
+		TrackID          uint32    `json:"track_id"`
+		Duration         uint64    `json:"duration"`
+		// DurationMilliSeconds uint64    `json:"duration_ms"`
+
+		Layer            int16 `json:"layer"`
+		AlternativeGroup int16 `json:"alternative_group"`
+		Volume           int16 `json:"volume"`
+		// reserved 2 bytes here
+		Matrix [9]int32 `json:"matrix"`
+		Width  uint32   `json:"width"`
+		Height uint32   `json:"height"`
+	}{
+		FullHeader: b.FullHeader,
+
+		CreationTime:     time1904.Unix(int64(b.CreationTime), 0).UTC(),
+		ModificationTime: time1904.Unix(int64(b.ModificationTime), 0).UTC(),
+		TrackID:          b.TrackID,
+		Duration:         b.Duration,
+		// DurationMilliSeconds: uint64(float64(b.Duration) * 1000 / float64(b.Timescale)),
+
+		Layer:            b.Layer,
+		AlternativeGroup: b.AlternativeGroup,
+		Volume:           b.Volume,
+		Matrix:           b.Matrix,
+		Width:            b.Width,
+		Height:           b.Height,
+	}
+
+	return json.Marshal(jsonBox)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

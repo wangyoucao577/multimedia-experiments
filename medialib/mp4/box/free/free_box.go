@@ -2,7 +2,7 @@
 package free
 
 import (
-	"fmt"
+	"encoding/json"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,9 +12,24 @@ import (
 
 // Box represents a ftyp box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Data []byte
+	Data []byte `json:"data"`
+}
+
+// MarshalJSON implements json.Marshaler interface.
+func (b Box) MarshalJSON() ([]byte, error) {
+	jsonBox := struct {
+		box.Header `json:"header"`
+
+		Data string `json:"data"`
+	}{
+		Header: b.Header,
+
+		Data: string(b.Data),
+	}
+
+	return json.Marshal(jsonBox)
 }
 
 // New creates a new Box.
@@ -22,11 +37,6 @@ func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
 	}
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} Data:%s", b.Header, string(b.Data))
 }
 
 // ParsePayload parse payload which requires basic box already exist.

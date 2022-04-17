@@ -2,7 +2,6 @@
 package stbl
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -18,17 +17,17 @@ import (
 
 // Box represents a stbl box.
 type Box struct {
-	box.Header
+	box.Header `json:"header"`
 
-	Stsd *stsd.Box
-	Stts *stts.Box
-	Stss *stss.Box
-	Stsc *stsc.Box
-	Stsz *stsz.Box
-	Stco *stco.Box
-	Ctts *ctts.Box
+	Stsd *stsd.Box `json:"stsd,omitempty"`
+	Stts *stts.Box `json:"stts,omitempty"`
+	Stss *stss.Box `json:"stss,omitempty"`
+	Stsc *stsc.Box `json:"stsc,omitempty"`
+	Stsz *stsz.Box `json:"stsz,omitempty"`
+	Stco *stco.Box `json:"stco,omitempty"`
+	Ctts *ctts.Box `json:"ctts,omitempty"`
 
-	boxesCreator map[string]box.NewFunc
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
@@ -79,11 +78,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	return createdBox, nil
-}
-
-// String serializes Box.
-func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} stsd:{%v} stts:{%v} stss:{%v} stsc:{%v} stsz:{%v} stco:{%v} ctts:{%v}", b.Header, b.Stsd, b.Stts, b.Stss, b.Stsc, b.Stsz, b.Stco, b.Ctts)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
