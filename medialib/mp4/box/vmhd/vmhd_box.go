@@ -2,6 +2,7 @@
 package vmhd
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 
@@ -13,6 +14,9 @@ import (
 // Box represents a vmhd box.
 type Box struct {
 	box.FullHeader
+
+	GraphicsMode uint16
+	OPColor      [3]uint16
 }
 
 // New creates a new Box.
@@ -26,7 +30,7 @@ func New(h box.Header) box.Box {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v}", b.FullHeader)
+	return fmt.Sprintf("FullHeader:{%v} GraphicsMode:{%d} OPColor:{%v}", b.FullHeader, b.GraphicsMode, b.OPColor)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -41,10 +45,26 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+	var parsedBytes uint64
+	data := make([]byte, 2)
+	if err := util.ReadOrError(r, data); err != nil {
 		return err
+	} else {
+		b.GraphicsMode = binary.BigEndian.Uint16(data)
+		parsedBytes += 2
+	}
+
+	for i := 0; i < len(b.OPColor); i++ {
+		if err := util.ReadOrError(r, data); err != nil {
+			return err
+		} else {
+			b.OPColor[i] = binary.BigEndian.Uint16(data)
+			parsedBytes += 2
+		}
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
