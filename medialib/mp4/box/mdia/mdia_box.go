@@ -9,6 +9,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdhd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/minf"
 )
 
 // Box represents a mdia box.
@@ -17,6 +18,7 @@ type Box struct {
 
 	Mdhd *mdhd.Box
 	Hdlr *hdlr.Box
+	Minf *minf.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -29,6 +31,7 @@ func New(h box.Header) box.Box {
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeMdhd: mdhd.New,
 			box.TypeHdlr: hdlr.New,
+			box.TypeMinf: minf.New,
 		},
 	}
 }
@@ -51,13 +54,15 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Mdhd = createdBox.(*mdhd.Box)
 	case box.TypeHdlr:
 		b.Hdlr = createdBox.(*hdlr.Box)
+	case box.TypeMinf:
+		b.Minf = createdBox.(*minf.Box)
 	}
 	return createdBox, nil
 }
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("Header:{%v} mdhd:{%v}", b.Header, b.Mdhd)
+	return fmt.Sprintf("Header:{%v} mdhd:{%v} Hdlr:{%v} Minf:{%v}", b.Header, b.Mdhd, b.Hdlr, b.Minf)
 }
 
 // ParsePayload parse payload which requires basic box already exist.
