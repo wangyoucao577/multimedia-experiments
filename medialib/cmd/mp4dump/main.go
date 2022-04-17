@@ -27,9 +27,20 @@ func main() {
 		}
 	}
 
-	if d, err := m.Boxes.MarshalString(false); err != nil {
+	var boxesStr []byte
+	var err error
+	switch getFormatFlag() {
+	case flagFormatYAML:
+		boxesStr, err = m.Boxes.YAML()
+	case flagFormatNewLines:
+		boxesStr, err = m.Boxes.JSONIndent("", "\t")
+	default:
+		boxesStr, err = m.Boxes.JSON()
+	}
+	if err != nil {
 		glog.Error(err)
 	} else {
-		fmt.Println(d)
+		fmt.Println(string(boxesStr))
 	}
+
 }

@@ -3,6 +3,7 @@ package mp4
 import (
 	"encoding/json"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/free"
@@ -36,27 +37,23 @@ func newBoxes() Boxes {
 	}
 }
 
-// Marshal formats boxes to JSON representation.
-func (b Boxes) Marshal() ([]byte, error) {
+// JSON marshals boxes to JSON representation
+func (b Boxes) JSON() ([]byte, error) {
 	return json.Marshal(b)
 }
 
-// Marshal formats boxes to JSON representation with customized indent.
-func (b Boxes) MarshalIndent(prefix, indent string) ([]byte, error) {
+// JSONIndent marshals boxes to JSON representation with customized indent.
+func (b Boxes) JSONIndent(prefix, indent string) ([]byte, error) {
 	return json.MarshalIndent(b, prefix, indent)
 }
 
-// Marshal formats boxes to JSON representation stored in string.
-func (b Boxes) MarshalString(lineEnding bool) (string, error) {
-	var d []byte
-	var err error
-
-	if lineEnding {
-		d, err = json.MarshalIndent(b, "", "\t")
-	} else {
-		d, err = json.Marshal(b)
+// YAML formats boxes to YAML representation.
+func (b Boxes) YAML() ([]byte, error) {
+	j, err := json.Marshal(b)
+	if err != nil {
+		return j, err
 	}
-	return string(d), err
+	return yaml.JSONToYAML(j)
 }
 
 // CreateSubBox creates directly included box, such as create `mvhd` in `moov`, or create `moov` on top level.
