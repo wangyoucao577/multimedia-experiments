@@ -24,6 +24,13 @@ const (
 	TypeDinf = "dinf"
 	TypeSmhd = "smhd"
 	TypeVmhd = "vmhd"
+	TypeStsd = "stsd"
+	TypeStts = "stts"
+	TypeStss = "stss"
+	TypeStsc = "stsc"
+	TypeStsz = "stsz"
+	TypeStco = "stco"
+	TypeCtts = "ctts"
 )
 
 var boxTypes = map[string]struct{}{
@@ -49,6 +56,13 @@ var boxTypes = map[string]struct{}{
 	TypeDinf: {},
 	TypeSmhd: {},
 	TypeVmhd: {},
+	TypeStsd: {},
+	TypeStts: {},
+	TypeStss: {},
+	TypeStsc: {},
+	TypeStsz: {},
+	TypeStco: {},
+	TypeCtts: {},
 }
 
 // BoxTypes returns box types map.
