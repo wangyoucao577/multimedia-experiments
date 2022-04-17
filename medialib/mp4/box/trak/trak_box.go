@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdia"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/tkhd"
 )
 
@@ -15,6 +16,7 @@ type Box struct {
 	box.FullHeader
 
 	Tkhd *tkhd.Box
+	Mdia *mdia.Box
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -28,6 +30,7 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeTkhd: tkhd.New,
+			box.TypeMdia: mdia.New,
 		},
 	}
 }
@@ -48,6 +51,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeTkhd:
 		b.Tkhd = createdBox.(*tkhd.Box)
+	case box.TypeMdia:
+		b.Mdia = createdBox.(*mdia.Box)
 	}
 
 	return createdBox, nil
@@ -55,7 +60,7 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 
 // String serializes Box.
 func (b Box) String() string {
-	return fmt.Sprintf("FullHeader:{%v} Tkhd:{%v}", b.FullHeader, b.Tkhd)
+	return fmt.Sprintf("FullHeader:{%v} Tkhd:{%v} Mdia:{%v}", b.FullHeader, b.Tkhd, b.Mdia)
 }
 
 // ParsePayload parse payload which requires basic box already exist.

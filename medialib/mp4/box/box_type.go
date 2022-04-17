@@ -17,6 +17,7 @@ const (
 	TypeIlst = "ilst"
 	TypeTrak = "trak"
 	TypeTkhd = "tkhd"
+	TypeMdia = "mdia"
 )
 
 var boxTypes = map[string]struct{}{
@@ -35,6 +36,7 @@ var boxTypes = map[string]struct{}{
 	TypeIlst: {},
 	TypeTrak: {},
 	TypeTkhd: {},
+	TypeMdia: {},
 }
 
 // BoxTypes returns box types map.
