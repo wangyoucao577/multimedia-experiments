@@ -3,6 +3,7 @@ package stsc
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -82,6 +83,10 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		}
 
 		b.Entries = append(b.Entries, entry)
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
