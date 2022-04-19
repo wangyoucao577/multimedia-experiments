@@ -2,6 +2,8 @@
 package stss
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,6 +14,9 @@ import (
 // Box represents a stss box.
 type Box struct {
 	box.FullHeader `json:"full_header"`
+
+	EntryCount    uint32   `json:"entry_count"`
+	SampleNumbers []uint32 `json:"sample_number"`
 }
 
 // New creates a new Box.
@@ -35,10 +40,30 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+	// start to parse payload
+	var parsedBytes uint64
+
+	data := make([]byte, 4)
+	if err := util.ReadOrError(r, data); err != nil {
 		return err
+	} else {
+		b.EntryCount = binary.BigEndian.Uint32(data)
+		parsedBytes += 4
+	}
+
+	for i := 0; i < int(b.EntryCount); i++ {
+
+		if err := util.ReadOrError(r, data); err != nil {
+			return err
+		} else {
+			num := binary.BigEndian.Uint32(data)
+			b.SampleNumbers = append(b.SampleNumbers, num)
+			parsedBytes += 4
+		}
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
