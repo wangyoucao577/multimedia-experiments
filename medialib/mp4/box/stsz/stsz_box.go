@@ -2,6 +2,8 @@
 package stsz
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,6 +14,10 @@ import (
 // Box represents a stsz box.
 type Box struct {
 	box.FullHeader `json:"full_header"`
+
+	SampleSize  uint32   `json:"sample_size"`
+	SampleCount uint32   `json:"sample_count"`
+	EntrySizes  []uint32 `json:"entry_size,omitempty"`
 }
 
 // New creates a new Box.
@@ -35,10 +41,39 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+	// start to parse payload
+	var parsedBytes uint64
+
+	data := make([]byte, 4)
+
+	if err := util.ReadOrError(r, data); err != nil {
 		return err
+	} else {
+		b.SampleSize = binary.BigEndian.Uint32(data)
+		parsedBytes += 4
+	}
+
+	if err := util.ReadOrError(r, data); err != nil {
+		return err
+	} else {
+		b.SampleCount = binary.BigEndian.Uint32(data)
+		parsedBytes += 4
+	}
+
+	if b.SampleSize == 0 {
+		for i := 0; i < int(b.SampleCount); i++ {
+			if err := util.ReadOrError(r, data); err != nil {
+				return err
+			} else {
+				size := binary.BigEndian.Uint32(data)
+				b.EntrySizes = append(b.EntrySizes, size)
+				parsedBytes += 4
+			}
+		}
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
