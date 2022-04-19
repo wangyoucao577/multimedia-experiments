@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
@@ -31,6 +32,7 @@ type Header struct {
 	UserType  *[16]uint8       `json:"user_type,omitempty"`
 
 	// internal fields
+	headerSize  uint64 `json:"-"`
 	payloadSize uint64 `json:"-"` // includes full box additional version and flags if exist
 }
 
@@ -44,12 +46,25 @@ type FullHeader struct {
 
 // String serializes Header.
 func (h Header) String() string {
-	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s payloadSize:%d", h.Size, h.Type[:], h.LargeSize, (h.UserType[:]), h.payloadSize)
+	return fmt.Sprintf("Size:%d Type:%s LargeSize:%d UserType:%s payloadSize:%d headerSize:%d", h.Size, h.Type[:], h.LargeSize, h.UserType[:], h.payloadSize, h.headerSize)
 }
 
 // PayloadSize returns payload size, 0 means continue to the end.
 func (h Header) PayloadSize() uint64 {
 	return h.payloadSize
+}
+
+// PayloadSizeMinus minus bytes from payload size.
+func (h *Header) PayloadSizeMinus(bytes int) {
+	if h.payloadSize == 0 {
+		return
+	}
+
+	if h.payloadSize >= uint64(bytes) {
+		h.payloadSize -= uint64(bytes)
+	} else {
+		glog.Errorf("payload size %d want to minus %d", h.payloadSize, bytes)
+	}
 }
 
 // Size returns total box bytes.
@@ -58,6 +73,11 @@ func (h Header) BoxSize() uint64 {
 		return h.LargeSize
 	}
 	return uint64(h.Size)
+}
+
+// HeaderSize returns header size.
+func (h Header) HeaderSize() uint64 {
+	return h.headerSize
 }
 
 // Parse parses basic box contents.
@@ -101,10 +121,9 @@ func (h *Header) Parse(r io.Reader) error {
 		parsedBytes += 16
 	}
 
-	if h.Size == 1 {
-		h.payloadSize = uint64(h.LargeSize) - uint64(parsedBytes)
-	} else if h.Size > 1 {
-		h.payloadSize = uint64(h.Size) - uint64(parsedBytes)
+	h.headerSize = uint64(parsedBytes)
+	if h.Size != 0 {
+		h.payloadSize = h.BoxSize() - uint64(parsedBytes)
 	}
 
 	return nil
@@ -141,6 +160,6 @@ func (f *FullHeader) ParseVersionFlag(r io.Reader) error {
 	}
 
 	// minus used bytes for accurate payload size
-	f.payloadSize -= 4
+	f.PayloadSizeMinus(4)
 	return nil
 }

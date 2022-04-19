@@ -55,6 +55,10 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Hdlr = createdBox.(*hdlr.Box)
 	case box.TypeMinf:
 		b.Minf = createdBox.(*minf.Box)
+		// handler_type is required in stsd
+		if b.Hdlr != nil {
+			b.Minf.SetHdlr(b.Hdlr)
+		}
 	}
 	return createdBox, nil
 }

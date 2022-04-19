@@ -2,23 +2,71 @@
 package stsd
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/avc1"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
 // Box represents a stsd box.
 type Box struct {
-	box.Header `json:"full_header"`
+	box.FullHeader `json:"full_header"`
+
+	EntryCount        uint32                `json:"entry_connt"`
+	AVC1SampleEntries []avc1.AVCSampleEntry `json:"avc1,omitempty"`
+
+	// passed from parent for later use
+	hdlr *hdlr.Box `json:"-"`
+
+	boxesCreator map[string]box.NewFunc `json:"-"`
 }
 
 // New creates a new Box.
 func New(h box.Header) box.Box {
 	return &Box{
-		Header: h,
+		FullHeader: box.FullHeader{
+			Header: h,
+		},
+
+		boxesCreator: map[string]box.NewFunc{
+			box.TypeAvc1: avc1.New,
+		},
 	}
+}
+
+// CreateSubBox tries to create sub level box.
+func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
+	creator, ok := b.boxesCreator[h.Type.String()]
+	if !ok {
+		glog.V(2).Infof("unknown box type %s, size %d payload %d", h.Type.String(), h.Size, h.PayloadSize())
+		return nil, box.ErrUnknownBoxType
+	}
+
+	createdBox := creator(h)
+	if createdBox == nil {
+		glog.Fatalf("create box type %s failed", h.Type.String())
+	}
+
+	switch b.hdlr.HandlerType.String() {
+	case box.TypeVide:
+		switch h.Type.String() {
+		case box.TypeAvc1:
+			b.AVC1SampleEntries = append(b.AVC1SampleEntries, *createdBox.(*avc1.AVCSampleEntry))
+			createdBox = &b.AVC1SampleEntries[len(b.AVC1SampleEntries)-1]
+		}
+	}
+
+	return createdBox, nil
+}
+
+// SetHdlr passes hdlr box for later use.
+func (b *Box) SetHdlr(h *hdlr.Box) {
+	b.hdlr = h
 }
 
 // ParsePayload parse payload which requires basic box already exist.
@@ -28,10 +76,43 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return nil
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+	// parse full header additional information first
+	if err := b.FullHeader.ParseVersionFlag(r); err != nil {
 		return err
+	}
+
+	// requires handler_type before parse
+	if b.hdlr == nil {
+		return fmt.Errorf("no handler_type found")
+	}
+
+	// start to parse payload
+	var parsedBytes uint64
+
+	data := make([]byte, 4)
+	if err := util.ReadOrError(r, data); err != nil {
+		return err
+	} else {
+		b.EntryCount = binary.BigEndian.Uint32(data)
+		parsedBytes += 4
+	}
+
+	for i := 0; i < int(b.EntryCount); i++ {
+		boxHeader, err := box.ParseBox(r, b)
+		if err != nil {
+			if err == io.EOF {
+				return err
+			} else if err == box.ErrUnknownBoxType {
+				// after ignore the box, continue to parse next
+			} else {
+				return err
+			}
+		}
+		parsedBytes += boxHeader.BoxSize()
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil

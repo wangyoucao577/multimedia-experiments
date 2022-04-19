@@ -31,6 +31,11 @@ const (
 	TypeStsz = "stsz"
 	TypeStco = "stco"
 	TypeCtts = "ctts"
+
+	// sample entry
+	TypeVide = "vide"
+	TypeAvc1 = "avc1"
+	TypeAvcC = "avcC"
 )
 
 var boxTypes = map[string]struct{}{
@@ -63,6 +68,10 @@ var boxTypes = map[string]struct{}{
 	TypeStsz: {},
 	TypeStco: {},
 	TypeCtts: {},
+
+	TypeVide: {},
+	TypeAvc1: {},
+	TypeAvcC: {},
 }
 
 // BoxTypes returns box types map.

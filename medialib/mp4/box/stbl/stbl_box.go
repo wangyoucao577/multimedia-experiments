@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/ctts"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/stco"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/stsc"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/stsd"
@@ -27,7 +28,15 @@ type Box struct {
 	Stco *stco.Box `json:"stco,omitempty"`
 	Ctts *ctts.Box `json:"ctts,omitempty"`
 
+	// passed from parent for later use
+	hdlr *hdlr.Box `json:"-"`
+
 	boxesCreator map[string]box.NewFunc `json:"-"`
+}
+
+// SetHdlr passes hdlr box for later use.
+func (b *Box) SetHdlr(h *hdlr.Box) {
+	b.hdlr = h
 }
 
 // New creates a new Box.
@@ -63,6 +72,9 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeStsd:
 		b.Stsd = createdBox.(*stsd.Box)
+		if b.hdlr != nil {
+			b.Stsd.SetHdlr(b.hdlr) // requires handler_type for payload parsing
+		}
 	case box.TypeStts:
 		b.Stts = createdBox.(*stts.Box)
 	case box.TypeStss:

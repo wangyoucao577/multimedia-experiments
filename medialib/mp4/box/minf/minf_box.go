@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/dinf"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/smhd"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/stbl"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/vmhd"
@@ -20,6 +21,9 @@ type Box struct {
 	Dinf *dinf.Box `json:"dinf,omitempty"`
 	Smhd *smhd.Box `json:"smhd,omitempty"`
 	Vmhd *vmhd.Box `json:"vmhd,omitempty"`
+
+	// passed from parent for later use
+	hdlr *hdlr.Box `json:"-"`
 
 	boxesCreator map[string]box.NewFunc `json:"-"`
 }
@@ -38,6 +42,11 @@ func New(h box.Header) box.Box {
 	}
 }
 
+// SetHdlr passes hdlr box for later use.
+func (b *Box) SetHdlr(h *hdlr.Box) {
+	b.hdlr = h
+}
+
 // CreateSubBox tries to create sub level box.
 func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	creator, ok := b.boxesCreator[h.Type.String()]
@@ -54,6 +63,10 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeStbl:
 		b.Stbl = createdBox.(*stbl.Box)
+		// handler_type is required in stsd
+		if b.hdlr != nil {
+			b.Stbl.SetHdlr(b.hdlr)
+		}
 	case box.TypeDinf:
 		b.Dinf = createdBox.(*dinf.Box)
 	case box.TypeSmhd:
