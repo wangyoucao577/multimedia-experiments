@@ -85,18 +85,12 @@ func (v *VisualSampleEntry) ParsePayload(r io.Reader) error {
 		parsedBytes += 16
 	}
 
-	if err := util.ReadOrError(r, data[:2]); err != nil {
+	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
 		v.Width = binary.BigEndian.Uint16(data[:2])
-		parsedBytes += 2
-	}
-
-	if err := util.ReadOrError(r, data[:2]); err != nil {
-		return err
-	} else {
-		v.Height = binary.BigEndian.Uint16(data[:2])
-		parsedBytes += 2
+		v.Height = binary.BigEndian.Uint16(data[2:])
+		parsedBytes += 4
 	}
 
 	if err := util.ReadOrError(r, data); err != nil {
@@ -109,7 +103,7 @@ func (v *VisualSampleEntry) ParsePayload(r io.Reader) error {
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
-		v.Height = binary.BigEndian.Uint16(data)
+		v.Vertresolution = binary.BigEndian.Uint32(data)
 		parsedBytes += 4
 	}
 
