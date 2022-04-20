@@ -11,6 +11,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/fixedpoint"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/time1904"
 )
 
@@ -29,8 +30,8 @@ type Box struct {
 	Volume           int16 `json:"volume"`
 	// reserved 2 bytes here
 	Matrix [9]int32 `json:"matrix"`
-	Width  uint32   `json:"width"`
-	Height uint32   `json:"height"`
+	Width  float32  `json:"width"`  // 4 bytes in file
+	Height float32  `json:"height"` // 4 bytes in file
 }
 
 // New creates a new Box.
@@ -58,8 +59,8 @@ func (b Box) MarshalJSON() ([]byte, error) {
 		Volume           int16 `json:"volume"`
 		// reserved 2 bytes here
 		Matrix [9]int32 `json:"matrix"`
-		Width  uint32   `json:"width"`
-		Height uint32   `json:"height"`
+		Width  float32  `json:"width"`
+		Height float32  `json:"height"`
 	}{
 		FullHeader: b.FullHeader,
 
@@ -197,14 +198,16 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
-		b.Width = binary.BigEndian.Uint32(data)
+		widthFixedPoint := binary.BigEndian.Uint32(data)
+		b.Width = float32(fixedpoint.From16x16(float64(widthFixedPoint)))
 		parsedBytes += 4
 	}
 
 	if err := util.ReadOrError(r, data); err != nil {
 		return err
 	} else {
-		b.Height = binary.BigEndian.Uint32(data)
+		heightFixedPoint := binary.BigEndian.Uint32(data)
+		b.Height = float32(fixedpoint.From16x16(float64(heightFixedPoint)))
 		parsedBytes += 4
 	}
 
