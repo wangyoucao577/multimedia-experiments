@@ -1,6 +1,7 @@
 package vide
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 
@@ -21,9 +22,9 @@ type VisualSampleEntry struct {
 	Horizresolution uint32 `json:"horizresolution"`
 	Vertresolution  uint32 `json:"vertresolution"`
 	// 4 bytes reserved here
-	FrameCount     uint16   `json:"frame_count"`
-	Compressorname [32]byte `json:"compressorname"`
-	Depth          uint16   `json:"depth"`
+	FrameCount     uint16 `json:"frame_count"`
+	Compressorname string `json:"compressorname"` // 32 bytes in file
+	Depth          uint16 `json:"depth"`
 	// 2 bytes pre_defined here
 	// other optional boxes from derived specifications
 }
@@ -126,10 +127,14 @@ func (v *VisualSampleEntry) ParsePayload(r io.Reader) error {
 		parsedBytes += 2
 	}
 
-	if err := util.ReadOrError(r, v.Compressorname[:]); err != nil {
+	const compressorNameDataLen = 32 // compressor name has fixed 32 bytes in file
+	compressorNameData := make([]byte, compressorNameDataLen)
+	if err := util.ReadOrError(r, compressorNameData); err != nil {
 		return err
 	} else {
-		parsedBytes += uint(len(v.Compressorname))
+		compressorNameData = bytes.TrimRight(compressorNameData, "\u0000") // trim last 0 to avoid `\u0000` in encoded json
+		v.Compressorname = string(compressorNameData)
+		parsedBytes += uint(compressorNameDataLen)
 	}
 
 	if err := util.ReadOrError(r, data[:2]); err != nil {

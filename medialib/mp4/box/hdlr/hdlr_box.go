@@ -2,6 +2,7 @@
 package hdlr
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -74,6 +75,7 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		if err := util.ReadOrError(r, data); err != nil {
 			return err
 		}
+		data = bytes.TrimSuffix(data, []byte{0}) // trim last 0 to avoid `\u0000` in encoded json
 		b.Name = string(data)
 	}
 
