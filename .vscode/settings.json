@@ -5,4 +5,5 @@
         "--header-insertion=never", // avoid error header insertion 
     ],
     "editor.formatOnSave": true, // Use clangd's internal clang-format engine
+    "json.maxItemsComputed": 50000
 }
