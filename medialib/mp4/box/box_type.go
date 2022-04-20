@@ -36,6 +36,7 @@ const (
 	TypeVide = "vide"
 	TypeAvc1 = "avc1"
 	TypeAvcC = "avcC"
+	TypeBtrt = "btrt"
 )
 
 var boxTypes = map[string]struct{}{
@@ -72,6 +73,7 @@ var boxTypes = map[string]struct{}{
 	TypeVide: {},
 	TypeAvc1: {},
 	TypeAvcC: {},
+	TypeBtrt: {},
 }
 
 // BoxTypes returns box types map.

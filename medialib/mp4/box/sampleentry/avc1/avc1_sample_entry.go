@@ -7,6 +7,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry"
 	avcc "github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/avcC"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/btrt"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/vide"
 )
 
@@ -15,6 +16,7 @@ type AVCSampleEntry struct {
 	vide.VisualSampleEntry
 
 	AVCConfig *avcc.AVCConfigrationBox `json:"avcC"`
+	Btrt      *btrt.Box                `json:"btrt,omitempty"`
 
 	boxesCreator map[string]box.NewFunc `json:"-"`
 }
@@ -30,6 +32,7 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeAvcC: avcc.New,
+			box.TypeBtrt: btrt.New,
 		},
 	}
 }
@@ -50,6 +53,8 @@ func (a *AVCSampleEntry) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeAvcC:
 		a.AVCConfig = createdBox.(*avcc.AVCConfigrationBox)
+	case box.TypeBtrt:
+		a.Btrt = createdBox.(*btrt.Box)
 	}
 
 	return createdBox, nil
