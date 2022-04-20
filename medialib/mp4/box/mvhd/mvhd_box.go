@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/time1904"
@@ -76,6 +77,10 @@ func (b Box) MarshalJSON() ([]byte, error) {
 
 // ParsePayload parse payload which requires basic box already exist.
 func (b *Box) ParsePayload(r io.Reader) error {
+	if err := b.Validate(); err != nil {
+		glog.Warningf("box %s invalid, err %v", b.Type, err)
+		return nil
+	}
 
 	// parse full header additional information first
 	if err := b.FullHeader.ParseVersionFlag(r); err != nil {

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
@@ -69,10 +68,6 @@ func New(h box.Header) box.Box {
 
 // ParsePayload parse payload which requires basic box already exist.
 func (v *VisualSampleEntry) ParsePayload(r io.Reader) error {
-	if v.PayloadSize() == 0 {
-		glog.Warningf("sample entry box %s is empty", v.Type)
-		return nil
-	}
 
 	// parse sample entry data
 	if err := v.SampleEntry.ParseData(r); err != nil {

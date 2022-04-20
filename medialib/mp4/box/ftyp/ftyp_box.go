@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
@@ -28,6 +29,10 @@ func New(h box.Header) box.Box {
 
 // ParsePayload parse payload which requires basic box already exist.
 func (b *Box) ParsePayload(r io.Reader) error {
+	if err := b.Validate(); err != nil {
+		glog.Warningf("box %s invalid, err %v", b.Type, err)
+		return nil
+	}
 
 	var parsedBytes uint32
 	payloadSize := b.PayloadSize()

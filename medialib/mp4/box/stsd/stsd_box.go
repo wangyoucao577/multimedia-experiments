@@ -71,8 +71,8 @@ func (b *Box) SetHdlr(h *hdlr.Box) {
 
 // ParsePayload parse payload which requires basic box already exist.
 func (b *Box) ParsePayload(r io.Reader) error {
-	if b.PayloadSize() == 0 {
-		glog.Warningf("box %s is empty", b.Type)
+	if err := b.Validate(); err != nil {
+		glog.Warningf("box %s invalid, err %v", b.Type, err)
 		return nil
 	}
 
