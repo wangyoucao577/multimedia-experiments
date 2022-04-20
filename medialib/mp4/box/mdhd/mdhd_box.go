@@ -14,6 +14,10 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/time1904"
 )
 
+const (
+	languageCodeOffset = 0x60 // ISO/IEC 14496-12:2015 8.4.2
+)
+
 // Box represents a mdhd box.
 type Box struct {
 	box.FullHeader `json:"full_header"`
@@ -23,9 +27,9 @@ type Box struct {
 	Timescale        uint32 `json:"timescale"`
 	Duration         uint64 `json:"duration"`
 
-	Pad        uint8    `json:"pad"`      // 1 bit
-	Language   [3]uint8 `json:"language"` // 5 bytes per uint
-	Predefined uint16   `json:"pre_defined"`
+	Pad        uint8   `json:"pad"`      // 1 bit
+	Language   [3]byte `json:"language"` // 5 bytes per uint
+	Predefined uint16  `json:"pre_defined"`
 }
 
 // New creates a new Box.
@@ -48,9 +52,9 @@ func (b Box) MarshalJSON() ([]byte, error) {
 		Duration             uint64    `json:"duration"`
 		DurationMilliSeconds uint64    `json:"duration_ms"`
 
-		Pad        uint8    `json:"pad"`      // 1 bit
-		Language   [3]uint8 `json:"language"` // 5 bytes per uint
-		Predefined uint16   `json:"pre_defined"`
+		Pad        uint8  `json:"pad"`      // 1 bit
+		Language   string `json:"language"` // 5 bytes per uint
+		Predefined uint16 `json:"pre_defined"`
 	}{
 		FullHeader: b.FullHeader,
 
@@ -61,7 +65,7 @@ func (b Box) MarshalJSON() ([]byte, error) {
 		DurationMilliSeconds: uint64(float64(b.Duration) * 1000 / float64(b.Timescale)),
 
 		Pad:        b.Pad,
-		Language:   b.Language,
+		Language:   string(b.Language[:]),
 		Predefined: b.Predefined,
 	}
 
@@ -138,6 +142,10 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		b.Language[0] = (uint8(data[0]) >> 2) & 0x1F
 		b.Language[1] = ((uint8(data[0]) & 0x3) << 3) | ((uint8(data[1]) >> 5) & 0x7)
 		b.Language[2] = uint8(data[1]) & 0x1F
+
+		for i := 0; i < len(b.Language); i++ {
+			b.Language[i] += languageCodeOffset // character is packed as the difference between its ASCII value and 0x60.
+		}
 
 		b.Predefined = binary.BigEndian.Uint16(data[2:4])
 
