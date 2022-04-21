@@ -1,23 +1,18 @@
-// Package moof represents moof type box.
-package moof
+// Package traf represents traf type box.
+package traf
 
 import (
 	"io"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mfhd"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/traf"
 )
 
-// Box represents a moof box.
+// Box represents a traf box.
 type Box struct {
 	box.Header `json:"header"`
 
-	Mfhd *mfhd.Box
-	Traf *traf.Box
-
-	boxesCreator map[string]box.NewFunc `json:"-"`
+	boxesCreator map[string]box.NewFunc
 }
 
 // New creates a new Box.
@@ -25,10 +20,7 @@ func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
 
-		boxesCreator: map[string]box.NewFunc{
-			box.TypeMfhd: mfhd.New,
-			box.TypeTraf: traf.New,
-		},
+		boxesCreator: map[string]box.NewFunc{},
 	}
 }
 
@@ -46,10 +38,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	switch h.Type.String() {
-	case box.TypeMfhd:
-		b.Mfhd = createdBox.(*mfhd.Box)
-	case box.TypeTraf:
-		b.Traf = createdBox.(*traf.Box)
 	}
 
 	return createdBox, nil
@@ -80,5 +68,6 @@ func (b *Box) ParsePayload(r io.Reader) error {
 			break
 		}
 	}
+
 	return nil
 }
