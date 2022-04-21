@@ -45,6 +45,8 @@ const (
 	TypeStco = "stco"
 	TypeCtts = "ctts"
 	TypeDref = "dref"
+	TypeUrl  = "url "
+	TypeUrn  = "urn"
 
 	// sample entry
 	TypeVide = "vide"
@@ -84,6 +86,8 @@ var boxTypes = map[string]BasicInfo{
 	TypeStco: {Name: "Chunk Offset Box"},
 	TypeCtts: {Name: "Composition Time to Sample Box"},
 	TypeDref: {Name: "Data Reference Box"},
+	TypeUrl:  {Name: "Data Entry Url Box"},
+	TypeUrn:  {Name: "Data Entry Urn Box"},
 
 	TypeVide: {Name: "Visual Sample Entry"},
 	TypeAvc1: {Name: "AVC Sample Entry"},
