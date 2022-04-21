@@ -44,6 +44,7 @@ const (
 	TypeStsz = "stsz"
 	TypeStco = "stco"
 	TypeCtts = "ctts"
+	TypeDref = "dref"
 
 	// sample entry
 	TypeVide = "vide"
@@ -82,6 +83,7 @@ var boxTypes = map[string]BasicInfo{
 	TypeStsz: {Name: "Sample Size Box"},
 	TypeStco: {Name: "Chunk Offset Box"},
 	TypeCtts: {Name: "Composition Time to Sample Box"},
+	TypeDref: {Name: "Data Reference Box"},
 
 	TypeVide: {Name: "Visual Sample Entry"},
 	TypeAvc1: {Name: "AVC Sample Entry"},

@@ -1,19 +1,17 @@
-// Package dinf represents dinf type box.
-package dinf
+// Package dref represents dref type box.
+package dref
 
 import (
 	"io"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/dref"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
-// Box represents a dinf box.
+// Box represents a dref box.
 type Box struct {
-	box.Header `json:"header"`
-
-	Dref *dref.Box `json:"dref"`
+	box.FullHeader `json:"full_header"`
 
 	boxesCreator map[string]box.NewFunc `json:"-"`
 }
@@ -21,11 +19,11 @@ type Box struct {
 // New creates a new Box.
 func New(h box.Header) box.Box {
 	return &Box{
-		Header: h,
-
-		boxesCreator: map[string]box.NewFunc{
-			box.TypeDref: dref.New,
+		FullHeader: box.FullHeader{
+			Header: h,
 		},
+
+		boxesCreator: map[string]box.NewFunc{},
 	}
 }
 
@@ -43,8 +41,6 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	switch h.Type.String() {
-	case box.TypeDref:
-		b.Dref = createdBox.(*dref.Box)
 	}
 
 	return createdBox, nil
@@ -57,23 +53,15 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return nil
 	}
 
-	var parsedBytes uint64
-	for {
-		boxHeader, err := box.ParseBox(r, b)
-		if err != nil {
-			if err == io.EOF {
-				return err
-			} else if err == box.ErrUnknownBoxType {
-				// after ignore the box, continue to parse next
-			} else {
-				return err
-			}
-		}
-		parsedBytes += boxHeader.BoxSize()
+	// parse full header additional information first
+	if err := b.FullHeader.ParseVersionFlag(r); err != nil {
+		return err
+	}
 
-		if parsedBytes == b.PayloadSize() {
-			break
-		}
+	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
+	//TODO: parse payload
+	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
+		return err
 	}
 
 	return nil
