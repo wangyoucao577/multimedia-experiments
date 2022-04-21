@@ -9,6 +9,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/free"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/ftyp"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdat"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moof"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov"
 )
 
@@ -18,6 +19,7 @@ type Boxes struct {
 	Free []free.Box `json:"free,omitempty"`
 	Mdat *mdat.Box  `json:"mdat,omitempty"`
 	Moov *moov.Box  `json:"moov,omitempty"`
+	Moof []moof.Box `json:"moof,omitempty"`
 
 	//TODO: other boxes
 
@@ -33,6 +35,7 @@ func newBoxes() Boxes {
 			box.TypeSkip: free.New,
 			box.TypeMdat: mdat.New,
 			box.TypeMoov: moov.New,
+			box.TypeMoof: moof.New,
 		},
 	}
 }
@@ -80,6 +83,9 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Mdat = createdBox.(*mdat.Box)
 	case box.TypeMoov:
 		b.Moov = createdBox.(*moov.Box)
+	case box.TypeMoof:
+		b.Moof = append(b.Moof, *createdBox.(*moof.Box))
+		createdBox = &b.Moof[len(b.Moof)-1] // reference to the last empty moof box
 	}
 
 	return createdBox, nil

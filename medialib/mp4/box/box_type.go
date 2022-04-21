@@ -47,6 +47,7 @@ const (
 	TypeDref = "dref"
 	TypeUrl  = "url "
 	TypeUrn  = "urn"
+	TypeMoof = "moof"
 
 	// sample entry
 	TypeVide = "vide"
@@ -88,6 +89,7 @@ var boxTypes = map[string]BasicInfo{
 	TypeDref: {Name: "Data Reference Box"},
 	TypeUrl:  {Name: "Data Entry Url Box"},
 	TypeUrn:  {Name: "Data Entry Urn Box"},
+	TypeMoof: {Name: "Movie Fragment Box"},
 
 	TypeVide: {Name: "Visual Sample Entry"},
 	TypeAvc1: {Name: "AVC Sample Entry"},
