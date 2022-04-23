@@ -6,14 +6,18 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/tfdt"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/tfhd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/trun"
 )
 
 // Box represents a traf box.
 type Box struct {
 	box.Header `json:"header"`
 
-	Tfhd *tfhd.Box `json:"tfhd"`
+	Tfhd *tfhd.Box  `json:"tfhd"`
+	Trun []trun.Box `json:"trun"`
+	Tfdt *tfdt.Box  `json:"tfdt,omitempty"`
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -25,6 +29,8 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeTfhd: tfhd.New,
+			box.TypeTrun: trun.New,
+			box.TypeTfdt: tfdt.New,
 		},
 	}
 }
@@ -45,6 +51,11 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	switch h.Type.String() {
 	case box.TypeTfhd:
 		b.Tfhd = createdBox.(*tfhd.Box)
+	case box.TypeTrun:
+		b.Trun = append(b.Trun, *createdBox.(*trun.Box))
+		createdBox = &b.Trun[len(b.Trun)-1]
+	case box.TypeTfdt:
+		b.Tfdt = createdBox.(*tfdt.Box)
 	}
 
 	return createdBox, nil

@@ -103,19 +103,6 @@ func (b *Box) ParsePayload(r io.Reader) error {
 			parsedBytes += 4
 		}
 	}
-	// arr := []*uint32{&b.SampleDescriptionIndex, &b.DefaultSampleDuration, &b.DefaultSampleSize, &b.DefaultSampleFlags}
-	// for i := 0; i < len(arr); i++ {
-	// 	if parsedBytes >= payloadSize {
-	// 		break
-	// 	}
-
-	// 	if err := util.ReadOrError(r, data[:4]); err != nil {
-	// 		return err
-	// 	} else {
-	// 		*arr[i] = binary.BigEndian.Uint32(data[:4])
-	// 		parsedBytes += 4
-	// 	}
-	// }
 
 	if parsedBytes != payloadSize {
 		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, payloadSize)
