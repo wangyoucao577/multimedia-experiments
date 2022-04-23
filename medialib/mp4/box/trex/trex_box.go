@@ -2,6 +2,8 @@
 package trex
 
 import (
+	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -12,6 +14,12 @@ import (
 // Box represents a trex box.
 type Box struct {
 	box.FullHeader `json:"full_header"`
+
+	TrackID                       uint32 `json:"track_id"`
+	DefaultSampleDescriptionIndex uint32 `json:"default_sample_description_index"`
+	DefaultSampleDuration         uint32 `json:"default_sample_duration"`
+	DefaultSampleSize             uint32 `json:"default_sample_size"`
+	DefaultSampleFlags            uint32 `json:"default_sample_flags"`
 }
 
 // New creates a new Box.
@@ -35,10 +43,22 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		return err
 	}
 
-	glog.Warningf("box type %s payload bytes %d parsing TODO", b.Type, b.PayloadSize())
-	//TODO: parse payload
-	if err := util.ReadOrError(r, make([]byte, b.PayloadSize())); err != nil {
-		return err
+	// start to parse payload
+	var parsedBytes uint64
+	data := make([]byte, 4)
+
+	arr := []*uint32{&b.TrackID, &b.DefaultSampleDescriptionIndex, &b.DefaultSampleDuration, &b.DefaultSampleSize, &b.DefaultSampleFlags}
+	for i := 0; i < len(arr); i++ {
+		if err := util.ReadOrError(r, data); err != nil {
+			return err
+		} else {
+			*arr[i] = binary.BigEndian.Uint32(data)
+			parsedBytes += 4
+		}
+	}
+
+	if parsedBytes != b.PayloadSize() {
+		return fmt.Errorf("box %s parsed bytes != payload size: %d != %d", b.Type, parsedBytes, b.PayloadSize())
 	}
 
 	return nil
