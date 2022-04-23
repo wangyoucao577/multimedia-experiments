@@ -50,6 +50,7 @@ const (
 	TypeMoof = "moof"
 	TypeMfhd = "mfhd"
 	TypeTraf = "traf"
+	TypeTfhd = "tfhd"
 
 	// sample entry
 	TypeVide = "vide"
@@ -94,6 +95,7 @@ var boxTypes = map[string]BasicInfo{
 	TypeMoof: {Name: "Movie Fragment Box"},
 	TypeMfhd: {Name: "Movie Fragment Header Box"},
 	TypeTraf: {Name: "Track Fragment Box"},
+	TypeTfhd: {Name: "Track Fragment Header Box"},
 
 	TypeVide: {Name: "Visual Sample Entry"},
 	TypeAvc1: {Name: "AVC Sample Entry"},

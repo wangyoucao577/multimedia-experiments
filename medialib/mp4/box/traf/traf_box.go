@@ -6,11 +6,14 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/tfhd"
 )
 
 // Box represents a traf box.
 type Box struct {
 	box.Header `json:"header"`
+
+	Tfhd *tfhd.Box `json:"tfhd"`
 
 	boxesCreator map[string]box.NewFunc
 }
@@ -20,7 +23,9 @@ func New(h box.Header) box.Box {
 	return &Box{
 		Header: h,
 
-		boxesCreator: map[string]box.NewFunc{},
+		boxesCreator: map[string]box.NewFunc{
+			box.TypeTfhd: tfhd.New,
+		},
 	}
 }
 
@@ -38,6 +43,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	switch h.Type.String() {
+	case box.TypeTfhd:
+		b.Tfhd = createdBox.(*tfhd.Box)
 	}
 
 	return createdBox, nil
