@@ -1,26 +1,21 @@
-// Package moov defines moov box structure which contains meta data.
-package moov
+// Package mvex represents mvex type box.
+package mvex
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mvex"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mvhd"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/trak"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/udta"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mehd"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/trex"
 )
 
-// Box represents a mdat box.
+// Box represents a mvex box.
 type Box struct {
 	box.Header `json:"header"`
 
-	Mvhd *mvhd.Box  `json:"mvhd,omitempty"`
-	Udta *udta.Box  `json:"udta,omitempty"`
-	Trak []trak.Box `json:"trak,omitempty"`
-	Mvex *mvex.Box  `json:"mvex,omitempty"`
+	Mehd *mehd.Box `json:"mehd,omitempty"`
+	Trex *trex.Box `json:"trex"`
 
 	boxesCreator map[string]box.NewFunc `json:"-"`
 }
@@ -31,10 +26,8 @@ func New(h box.Header) box.Box {
 		Header: h,
 
 		boxesCreator: map[string]box.NewFunc{
-			box.TypeMvhd: mvhd.New,
-			box.TypeUdta: udta.New,
-			box.TypeTrak: trak.New,
-			box.TypeMvex: mvex.New,
+			box.TypeMehd: mehd.New,
+			box.TypeTrex: trex.New,
 		},
 	}
 }
@@ -53,15 +46,10 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	switch h.Type.String() {
-	case box.TypeMvhd:
-		b.Mvhd = createdBox.(*mvhd.Box)
-	case box.TypeUdta:
-		b.Udta = createdBox.(*udta.Box)
-	case box.TypeTrak:
-		b.Trak = append(b.Trak, *createdBox.(*trak.Box))
-		createdBox = &b.Trak[len(b.Trak)-1] // reference to the last empty free box
-	case box.TypeMvex:
-		b.Mvex = createdBox.(*mvex.Box)
+	case box.TypeMehd:
+		b.Mehd = createdBox.(*mehd.Box)
+	case box.TypeTrex:
+		b.Trex = createdBox.(*trex.Box)
 	}
 
 	return createdBox, nil
@@ -72,12 +60,6 @@ func (b *Box) ParsePayload(r io.Reader) error {
 	if err := b.Validate(); err != nil {
 		glog.Warningf("box %s invalid, err %v", b.Type, err)
 		return nil
-	}
-
-	payloadSize := b.PayloadSize()
-
-	if payloadSize == 0 {
-		return fmt.Errorf("box %s is empty", b.Type)
 	}
 
 	var parsedBytes uint64
@@ -94,10 +76,9 @@ func (b *Box) ParsePayload(r io.Reader) error {
 		}
 		parsedBytes += boxHeader.BoxSize()
 
-		if parsedBytes == payloadSize {
+		if parsedBytes == b.PayloadSize() {
 			break
 		}
 	}
-
 	return nil
 }
