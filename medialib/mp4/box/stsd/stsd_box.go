@@ -10,6 +10,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/hdlr"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/avc1"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/sampleentry/mp4a"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 )
 
@@ -17,8 +18,9 @@ import (
 type Box struct {
 	box.FullHeader `json:"full_header"`
 
-	EntryCount        uint32                `json:"entry_connt"`
-	AVC1SampleEntries []avc1.AVCSampleEntry `json:"avc1,omitempty"`
+	EntryCount             uint32                      `json:"entry_connt"`
+	AVC1SampleEntries      []avc1.AVCSampleEntry       `json:"avc1,omitempty"`
+	MP4VisualSampleEntries []mp4a.MP4VisualSampleEntry `json:"mp4a,omitempty"`
 
 	// passed from parent for later use
 	hdlr *hdlr.Box `json:"-"`
@@ -35,6 +37,7 @@ func New(h box.Header) box.Box {
 
 		boxesCreator: map[string]box.NewFunc{
 			box.TypeAvc1: avc1.New,
+			box.TypeMp4a: mp4a.New,
 		},
 	}
 }
@@ -58,6 +61,12 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 		case box.TypeAvc1:
 			b.AVC1SampleEntries = append(b.AVC1SampleEntries, *createdBox.(*avc1.AVCSampleEntry))
 			createdBox = &b.AVC1SampleEntries[len(b.AVC1SampleEntries)-1]
+		}
+	case box.TypeSoun:
+		switch h.Type.String() {
+		case box.TypeMp4a:
+			b.MP4VisualSampleEntries = append(b.MP4VisualSampleEntries, *createdBox.(*mp4a.MP4VisualSampleEntry))
+			createdBox = &b.MP4VisualSampleEntries[len(b.MP4VisualSampleEntries)-1]
 		}
 	}
 

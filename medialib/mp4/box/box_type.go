@@ -59,9 +59,12 @@ const (
 
 	// sample entry
 	TypeVide = "vide"
+	TypeSoun = "soun"
 	TypeAvc1 = "avc1"
 	TypeAvcC = "avcC"
 	TypeBtrt = "btrt"
+	TypeMp4a = "mp4a"
+	TypeEsds = "esds"
 )
 
 var boxTypes = map[string]BasicInfo{
@@ -108,9 +111,12 @@ var boxTypes = map[string]BasicInfo{
 	TypeTrex: {Name: "Track Extends Box"},
 
 	TypeVide: {Name: "Visual Sample Entry"},
+	TypeSoun: {Name: "Audio Sample Entry"},
 	TypeAvc1: {Name: "AVC Sample Entry"},
 	TypeAvcC: {Name: "AVC Configuration Box"},
 	TypeBtrt: {Name: "MPEG4 Bit Rate Box"},
+	TypeMp4a: {Name: "MP4 Visual Sample Entry"},
+	TypeEsds: {Name: "ES Descriptor Box"},
 }
 
 // BoxTypes returns box types map.
