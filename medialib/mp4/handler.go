@@ -2,11 +2,9 @@
 package mp4
 
 import (
-	"io"
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box"
 )
 
 // Handler represents handler for `mp4` structure.
@@ -35,18 +33,7 @@ func (h *Handler) Parse() error {
 	}
 	defer h.close()
 
-	for {
-		if _, err := box.ParseBox(h.f, &h.Boxes); err != nil {
-			if err == io.EOF {
-				break
-			} else if err == box.ErrUnknownBoxType {
-				continue
-			}
-			return err
-		}
-	}
-
-	return nil
+	return h.Boxes.ParsePayload(h.f)
 }
 
 // Open opens mp4 file.

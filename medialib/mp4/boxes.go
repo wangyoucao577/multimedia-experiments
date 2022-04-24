@@ -2,6 +2,7 @@ package mp4
 
 import (
 	"encoding/json"
+	"io"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -90,4 +91,21 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 	}
 
 	return createdBox, nil
+}
+
+// ParsePayload acts as an root box to parse all sub boxes.
+func (b *Boxes) ParsePayload(r io.Reader) error {
+
+	for {
+		if _, err := box.ParseBox(r, b); err != nil {
+			if err == io.EOF {
+				break
+			} else if err == box.ErrUnknownBoxType {
+				continue
+			}
+			return err
+		}
+	}
+
+	return nil
 }

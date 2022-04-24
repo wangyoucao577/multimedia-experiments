@@ -19,8 +19,6 @@ type Box interface {
 
 	// Parse payload. It requires BasicBox(Header) has been set to the subset Box.
 	ParsePayload(r io.Reader) error
-
-	String() string
 }
 
 // ParentBox defines functions if a box possible to have sub/child box.
