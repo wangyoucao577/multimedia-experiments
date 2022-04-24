@@ -1,4 +1,4 @@
-// Package mdia represents mdia type box.
+// Package mdia represents Media Box.
 package mdia
 
 import (

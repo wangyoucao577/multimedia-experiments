@@ -1,4 +1,4 @@
-// Package udta represents user data boxes which may has type `udta`.
+// Package udta represents User Data Box.
 package udta
 
 import (

@@ -1,4 +1,4 @@
-// Package meta represents copy right boxes which may has type `meta`.
+// Package meta represents Meta Box.
 package meta
 
 import (

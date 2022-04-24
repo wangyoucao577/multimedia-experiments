@@ -1,3 +1,4 @@
+// Package vide represents Visual Sample Entry.
 package vide
 
 import (

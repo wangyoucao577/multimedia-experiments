@@ -1,4 +1,4 @@
-// Package stsz represents stsz type box.
+// Package stsz represents Sample Size Box.
 package stsz
 
 import (

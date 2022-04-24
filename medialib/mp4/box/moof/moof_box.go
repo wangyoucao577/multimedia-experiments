@@ -1,4 +1,4 @@
-// Package moof represents moof type box.
+// Package moof represents Movie Fragment Box.
 package moof
 
 import (

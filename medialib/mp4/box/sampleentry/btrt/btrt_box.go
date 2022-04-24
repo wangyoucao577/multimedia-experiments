@@ -1,4 +1,4 @@
-// Package btrt represents btrt type box.
+// Package btrt represents MPEG4 Bit Rate Box.
 package btrt
 
 import (

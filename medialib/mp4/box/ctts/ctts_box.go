@@ -1,4 +1,4 @@
-// Package ctts represents ctts type box.
+// Package ctts represents Composition Time to Sample Box.
 package ctts
 
 import (

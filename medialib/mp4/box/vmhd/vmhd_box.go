@@ -1,4 +1,4 @@
-// Package vmhd represents vmhd type box.
+// Package vmhd represents Video Media Header.
 package vmhd
 
 import (

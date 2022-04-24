@@ -1,4 +1,4 @@
-// Package urn represents urn type box.
+// Package urn represents Data Entry Urn Box.
 package urn
 
 import (

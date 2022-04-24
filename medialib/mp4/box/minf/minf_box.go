@@ -1,4 +1,4 @@
-// Package minf represents minf type box.
+// Package minf represents Media Information Box.
 package minf
 
 import (

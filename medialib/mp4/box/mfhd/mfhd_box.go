@@ -1,4 +1,4 @@
-// Package mfhd represents mfhd type box.
+// Package mfhd represents Movie Fragment Header Box.
 package mfhd
 
 import (

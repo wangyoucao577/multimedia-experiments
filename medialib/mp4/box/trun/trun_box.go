@@ -1,4 +1,4 @@
-// Package trun represents trun type box.
+// Package trun represents Track Fragment Run Box.
 package trun
 
 import (

@@ -1,4 +1,4 @@
-// Package stbl represents stbl type box.
+// Package stbl represents Sample Table Box.
 package stbl
 
 import (

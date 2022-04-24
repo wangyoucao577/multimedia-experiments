@@ -1,4 +1,4 @@
-// Package tkhd represents tkhd type box.
+// Package tkhd represents Track Header Box.
 package tkhd
 
 import (

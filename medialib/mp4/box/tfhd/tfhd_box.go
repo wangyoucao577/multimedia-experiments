@@ -1,4 +1,4 @@
-// Package tfhd represents tfhd type box.
+// Package tfhd represents Track Fragment Header Box.
 package tfhd
 
 import (

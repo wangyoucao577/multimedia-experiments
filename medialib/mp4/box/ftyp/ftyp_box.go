@@ -1,4 +1,4 @@
-// Package ftyp defines ftyp box structure.
+// Package ftyp defines File Type Box.
 package ftyp
 
 import (

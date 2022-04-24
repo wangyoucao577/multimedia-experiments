@@ -1,4 +1,4 @@
-// Package tfdt represents tfdt type box.
+// Package tfdt represents Track Fragment Base Media Decode Time Box.
 package tfdt
 
 import (

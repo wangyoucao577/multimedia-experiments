@@ -1,4 +1,4 @@
-// Package mehd represents mehd type box.
+// Package mehd represents Movie Extends Header Box.
 package mehd
 
 import (

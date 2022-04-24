@@ -1,4 +1,4 @@
-// Package mdhd represents mdhd type box.
+// Package mdhd represents Media Header Box.
 package mdhd
 
 import (

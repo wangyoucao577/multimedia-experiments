@@ -1,4 +1,4 @@
-// Package trak represents trak type box.
+// Package trak represents Track Reference Box.
 package trak
 
 import (

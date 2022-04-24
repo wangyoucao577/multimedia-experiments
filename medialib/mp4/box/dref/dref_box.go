@@ -1,4 +1,4 @@
-// Package dref represents dref type box.
+// Package dref represents Data Reference Box.
 package dref
 
 import (

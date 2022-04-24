@@ -1,4 +1,4 @@
-// Package stsd represents stsd type box.
+// Package stsd represents Sample Description Box.
 package stsd
 
 import (

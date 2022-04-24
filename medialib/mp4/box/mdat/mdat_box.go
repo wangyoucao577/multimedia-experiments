@@ -1,4 +1,4 @@
-// Package mdat defines mdat box structure which contains media data.
+// Package mdat represents Media Data Box.
 package mdat
 
 import (

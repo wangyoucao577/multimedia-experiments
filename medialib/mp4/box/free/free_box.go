@@ -1,4 +1,4 @@
-// Package free represents free-space boxes which may has type `free` or `skip`.
+// Package free represents Free Space Box which may has type `free` or `skip`.
 package free
 
 import (

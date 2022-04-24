@@ -1,4 +1,4 @@
-// Package mvex represents mvex type box.
+// Package mvex represents Movie Extends Box.
 package mvex
 
 import (

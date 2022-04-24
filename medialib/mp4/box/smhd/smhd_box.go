@@ -1,4 +1,4 @@
-// Package smhd represents smhd type box.
+// Package smhd represents Sound Media Header.
 package smhd
 
 import (

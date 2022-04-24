@@ -1,4 +1,4 @@
-// Package mvhd defines mvhd box structure.
+// Package mvhd represents Movie Header Box.
 package mvhd
 
 import (

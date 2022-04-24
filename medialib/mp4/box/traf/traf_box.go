@@ -1,4 +1,4 @@
-// Package traf represents traf type box.
+// Package traf represents Track Fragment Box.
 package traf
 
 import (

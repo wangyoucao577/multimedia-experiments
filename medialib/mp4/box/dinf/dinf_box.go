@@ -1,4 +1,4 @@
-// Package dinf represents dinf type box.
+// Package dinf represents Data Information Box.
 package dinf
 
 import (

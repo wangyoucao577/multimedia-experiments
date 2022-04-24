@@ -1,4 +1,4 @@
-// Package stss represents stss type box.
+// Package stss represents Sync Sample Box.
 package stss
 
 import (

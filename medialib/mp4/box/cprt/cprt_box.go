@@ -1,4 +1,4 @@
-// Package cprt represents copy right boxes which may has type `cprt`.
+// Package cprt represents Copyright Box.
 package cprt
 
 import (

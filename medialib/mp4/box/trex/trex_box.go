@@ -1,4 +1,4 @@
-// Package trex represents trex type box.
+// Package trex represents Track Extends Box.
 package trex
 
 import (

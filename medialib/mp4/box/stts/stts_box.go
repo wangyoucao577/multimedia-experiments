@@ -1,4 +1,4 @@
-// Package stts represents stts type box.
+// Package stts represents Decoding Time to Sample Box.
 package stts
 
 import (

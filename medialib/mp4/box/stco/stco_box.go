@@ -1,4 +1,4 @@
-// Package stco represents stco type box.
+// Package stco represents Chunk Offset Box.
 package stco
 
 import (

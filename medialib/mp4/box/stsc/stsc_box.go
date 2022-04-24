@@ -1,4 +1,4 @@
-// Package stsc represents stsc type box.
+// Package stsc represents Sample To Chunk Box.
 package stsc
 
 import (

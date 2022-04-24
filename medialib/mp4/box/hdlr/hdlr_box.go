@@ -1,4 +1,4 @@
-// Package hdlr represents hdlr type box.
+// Package hdlr represents Handler Reference Box.
 package hdlr
 
 import (

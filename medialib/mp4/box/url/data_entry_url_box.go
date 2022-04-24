@@ -1,4 +1,4 @@
-// Package url represents url type box.
+// Package url represents Data Entry Url Box.
 package url
 
 import (

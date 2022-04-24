@@ -46,34 +46,6 @@ func (h *Handler) Parse() error {
 		}
 	}
 
-	// for {
-	// boxHeader := box.Header{}
-	// if err := boxHeader.Parse(h.f); err != nil {
-	// 	if err == io.EOF {
-	// 		break
-	// 	}
-	// 	glog.Warningf("parse box header failed, err %v", err)
-	// 	return err
-	// }
-
-	// b, err := h.Boxes.CreateSubBox(boxHeader)
-	// if err != nil {
-	// 	//TODO: other types
-	// 	glog.Warningf("ignore %v", err)
-	// 	h.f.Seek(int64(boxHeader.PayloadSize()), 1)
-	// 	continue
-	// }
-
-	// if err := b.ParsePayload(h.f); err != nil {
-	// 	glog.Warningf("parse box type %s payload failed, err %v", string(boxHeader.Type[:]), err)
-	// 	return err
-	// }
-
-	// if boxHeader.Size == 0 {
-	// 	break // last box has been parsed
-	// }
-	// }
-
 	return nil
 }
 

@@ -1,3 +1,4 @@
+// Package avc1 represents AVC Sample Entry.
 package avc1
 
 import (

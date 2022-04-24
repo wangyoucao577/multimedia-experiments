@@ -1,4 +1,4 @@
-// Package moov defines moov box structure which contains meta data.
+// Package moov represents Movie Box.
 package moov
 
 import (
