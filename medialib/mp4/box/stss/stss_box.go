@@ -16,7 +16,7 @@ type Box struct {
 	box.FullHeader `json:"full_header"`
 
 	EntryCount    uint32   `json:"entry_count"`
-	SampleNumbers []uint32 `json:"sample_number"`
+	SampleNumbers []uint32 `json:"sample_number,omitempty"`
 }
 
 // New creates a new Box.

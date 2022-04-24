@@ -17,7 +17,7 @@ import (
 type Boxes struct {
 	Ftyp *ftyp.Box  `json:"ftyp,omitempty"`
 	Free []free.Box `json:"free,omitempty"`
-	Mdat *mdat.Box  `json:"mdat,omitempty"`
+	Mdat []mdat.Box `json:"mdat,omitempty"`
 	Moov *moov.Box  `json:"moov,omitempty"`
 	Moof []moof.Box `json:"moof,omitempty"`
 
@@ -80,7 +80,8 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Free = append(b.Free, *createdBox.(*free.Box))
 		createdBox = &b.Free[len(b.Free)-1] // reference to the last empty free box
 	case box.TypeMdat:
-		b.Mdat = createdBox.(*mdat.Box)
+		b.Mdat = append(b.Mdat, *createdBox.(*mdat.Box))
+		createdBox = &b.Mdat[len(b.Mdat)-1]
 	case box.TypeMoov:
 		b.Moov = createdBox.(*moov.Box)
 	case box.TypeMoof:

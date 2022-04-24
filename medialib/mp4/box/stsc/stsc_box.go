@@ -22,8 +22,8 @@ type ChunkEntry struct {
 type Box struct {
 	box.FullHeader `json:"full_header"`
 
-	EntryCount uint32
-	Entries    []ChunkEntry
+	EntryCount uint32       `json:"entry_count"`
+	Entries    []ChunkEntry `json:"entry,omitempty"`
 }
 
 // New creates a new Box.

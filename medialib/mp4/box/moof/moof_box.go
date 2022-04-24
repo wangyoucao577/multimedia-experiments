@@ -14,8 +14,8 @@ import (
 type Box struct {
 	box.Header `json:"header"`
 
-	Mfhd *mfhd.Box
-	Traf *traf.Box
+	Mfhd *mfhd.Box  `json:"mfhd"`
+	Traf []traf.Box `json:"traf,omitempty"`
 
 	boxesCreator map[string]box.NewFunc `json:"-"`
 }
@@ -49,7 +49,8 @@ func (b *Box) CreateSubBox(h box.Header) (box.Box, error) {
 	case box.TypeMfhd:
 		b.Mfhd = createdBox.(*mfhd.Box)
 	case box.TypeTraf:
-		b.Traf = createdBox.(*traf.Box)
+		b.Traf = append(b.Traf, *createdBox.(*traf.Box))
+		createdBox = &b.Traf[len(b.Traf)-1]
 	}
 
 	return createdBox, nil

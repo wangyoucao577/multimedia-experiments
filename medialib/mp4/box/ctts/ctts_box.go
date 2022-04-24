@@ -16,8 +16,8 @@ type Box struct {
 	box.FullHeader `json:"full_header"`
 
 	EntryCount    uint32   `json:"entry_count"`
-	SampleCounts  []uint32 `json:"sample_count"`
-	SampleOffsets []int64  `json:"sample_offset"` // uint32 or int32 in file, use int64 to contain both of them
+	SampleCounts  []uint32 `json:"sample_count,omitempty"`
+	SampleOffsets []int64  `json:"sample_offset,omitempty"` // uint32 or int32 in file, use int64 to contain both of them
 }
 
 // New creates a new Box.
