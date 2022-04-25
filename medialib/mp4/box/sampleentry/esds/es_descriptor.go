@@ -10,7 +10,7 @@ import (
 
 // ESDescriptor represents ES_Descriptor.
 type ESDescriptor struct {
-	Tag uint8 `json:"tag"`
+	Descriptor Descriptor `json:"descriptor"`
 
 	ESID                    uint16                  `json:"es_id"`
 	StreamDependenceFlag    uint8                   `json:"stream_dependence_flag"` // 1 bit
@@ -22,27 +22,22 @@ type ESDescriptor struct {
 	URLstring               string                  `json:"url_string,omitempty"` // len(URLstring) == URLLength
 	OCR_ES_Id               uint16                  `json:"ocr_es_id,omitempty"`
 	DecoderConfigDescriptor DecoderConfigDescriptor `json:"decoder_config_descriptor"`
+	SLConfigDescriptor      *SLConfigDescriptor     `json:"sl_config_descriptor,omitempty"`
 }
 
 func (e *ESDescriptor) parse(r io.Reader) (uint64, error) {
 
 	var parsedBytes uint64
+	var parsedHeaderBytes uint64
+
 	data := make([]byte, 4)
 
-	// first bytes is tag
-	if err := util.ReadOrError(r, data[:1]); err != nil {
+	// parse descriptor header
+	if bytes, err := e.Descriptor.parse(r); err != nil {
 		return parsedBytes, err
 	} else {
-		e.Tag = data[0]
-		parsedBytes += 1
-	}
-
-	// TODO: ignore 4 bytes, BUT WHY???
-	if err := util.ReadOrError(r, data); err != nil {
-		return parsedBytes, err
-	} else {
-		glog.Warningf("ignore 4 bytes data but not sure why: %v\n", data)
-		parsedBytes += 4
+		parsedBytes += bytes
+		parsedHeaderBytes += bytes
 	}
 
 	if err := util.ReadOrError(r, data[:3]); err != nil {
@@ -97,6 +92,20 @@ func (e *ESDescriptor) parse(r io.Reader) (uint64, error) {
 		return parsedBytes, err
 	} else {
 		parsedBytes += bytes
+	}
+
+	if uint64(e.Descriptor.Size) > parsedBytes-parsedHeaderBytes {
+		slDesc := SLConfigDescriptor{}
+		if bytes, err := slDesc.parse(r); err != nil {
+			return parsedBytes, err
+		} else {
+			e.SLConfigDescriptor = &slDesc
+			parsedBytes += bytes
+		}
+	}
+
+	if uint64(e.Descriptor.Size) != parsedBytes-parsedHeaderBytes {
+		glog.Warningf("descriptor %s(%d) still has %d bytes need to parse, parsed payload bytes != payload size: %d != %d", classTagName(e.Descriptor.Tag), e.Descriptor.Tag, uint64(e.Descriptor.Size)-uint64(parsedBytes-parsedHeaderBytes), parsedBytes-parsedHeaderBytes, e.Descriptor.Size)
 	}
 
 	return parsedBytes, nil

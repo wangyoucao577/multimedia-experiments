@@ -10,7 +10,7 @@ import (
 
 // DecoderConfigDescriptor represents DecoderConfigDescriptor.
 type DecoderConfigDescriptor struct {
-	Tag uint8 `json:"tag"`
+	Descriptor Descriptor `json:"descriptor"`
 
 	ObjectTypeIndication uint8 `json:"object_type_indication"`
 	StreamType           uint8 `json:"stream_type"` // 6 bits
@@ -24,24 +24,17 @@ type DecoderConfigDescriptor struct {
 }
 
 func (d *DecoderConfigDescriptor) parse(r io.Reader) (uint64, error) {
-	var parsedBytes uint64
 
+	var parsedBytes uint64
+	var parsedHeaderBytes uint64
 	data := make([]byte, 4)
 
-	// first bytes is tag
-	if err := util.ReadOrError(r, data[:1]); err != nil {
+	// parse descriptor header
+	if bytes, err := d.Descriptor.parse(r); err != nil {
 		return parsedBytes, err
 	} else {
-		d.Tag = data[0]
-		parsedBytes += 1
-	}
-
-	// TODO: ignore 4 bytes, BUT WHY???
-	if err := util.ReadOrError(r, data); err != nil {
-		return parsedBytes, err
-	} else {
-		glog.Warningf("ignore 4 bytes data but not sure why: %v\n", data)
-		parsedBytes += 4
+		parsedHeaderBytes += bytes
+		parsedBytes += bytes
 	}
 
 	if err := util.ReadOrError(r, data[:1]); err != nil {
@@ -76,10 +69,16 @@ func (d *DecoderConfigDescriptor) parse(r io.Reader) (uint64, error) {
 		parsedBytes += 4
 	}
 
-	if bytes, err := d.DecoderSpecificInfo.parse(r); err != nil {
-		return parsedBytes, err
-	} else {
-		parsedBytes += bytes
+	if d.Descriptor.Size > uint32(parsedBytes-parsedHeaderBytes) {
+		if bytes, err := d.DecoderSpecificInfo.parse(r); err != nil {
+			return parsedBytes, err
+		} else {
+			parsedBytes += bytes
+		}
+	}
+
+	if parsedBytes-parsedHeaderBytes != uint64(d.Descriptor.Size) {
+		glog.Warningf("descriptor %s(%d) still has %d bytes need to parse, parsed payload bytes != payload size: %d != %d", classTagName(d.Descriptor.Tag), d.Descriptor.Tag, uint64(d.Descriptor.Size)-uint64(parsedBytes-parsedHeaderBytes), parsedBytes-parsedHeaderBytes, d.Descriptor.Size)
 	}
 
 	return parsedBytes, nil
