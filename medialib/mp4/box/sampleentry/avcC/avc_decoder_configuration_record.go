@@ -41,6 +41,11 @@ type AVCDecoderConfigurationRecord struct {
 	SequenceParameterSetExtNALUnit [][]byte `json:"sequence_parameter_set_ext_nal_unit"`
 }
 
+// LengthSize returns NALU prefix length size.
+func (a *AVCDecoderConfigurationRecord) LengthSize() uint32 {
+	return uint32(a.LengthSizeMinusOne) + 1
+}
+
 func (a *AVCDecoderConfigurationRecord) parse(r io.Reader) (uint64, error) {
 
 	var parsedBytes uint64
