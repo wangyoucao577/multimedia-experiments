@@ -30,7 +30,6 @@ func main() {
 		}
 
 		data, err = parseMP4(flags.inputFilePath, getFormatFlag(), getContentFlag())
-
 	}
 
 	if err != nil {

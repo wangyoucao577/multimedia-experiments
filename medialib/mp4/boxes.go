@@ -14,6 +14,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdat"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moof"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/annexbes"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/es"
 )
 
@@ -177,4 +178,20 @@ func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
 	}
 
 	return &e, nil
+}
+
+// ExtractAnnexBES extracts AVC or HEVC Elementary Stream with AnnexB byte format.
+// Use trackID to select the specified one, trackID <= 0 means use the first found one.
+func (b *Boxes) ExtractAnnexBES(trackID int) (*annexbes.ElementaryStream, error) {
+	mp4ES, err := b.ExtractES(trackID)
+	if err != nil {
+		return nil, err
+	}
+
+	annexbES := annexbes.ElementaryStream{}
+	for i := range mp4ES.LengthNALU {
+		annexbES.NALU = append(annexbES.NALU, mp4ES.LengthNALU[i].NALU)
+	}
+
+	return &annexbES, nil
 }

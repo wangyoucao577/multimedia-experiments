@@ -39,6 +39,21 @@ func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 		}
 	}
 
+	// parse avc/hevc annexb es and print
+	if contentType == flagContentRawAnnexBES {
+		if es, err := m.Boxes.ExtractAnnexBES(0); err != nil {
+			glog.Errorf("Extract ES failed, err %v", err)
+			exit.Fail()
+		} else {
+			// print AVC ES
+			if _, err := es.Dump(os.Stdout); err != nil {
+				glog.Errorf("Dump ES failed, err %v", err)
+				exit.Fail()
+			}
+			return nil, nil
+		}
+	}
+
 	// print mp4 boxes
 	return marshalByFormat(m.Boxes, format)
 }

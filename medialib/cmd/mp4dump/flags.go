@@ -13,7 +13,13 @@ var flags struct {
 
 func init() {
 	flag.StringVar(&flags.inputFilePath, "i", "", "Input mp4 file path.")
-	flag.StringVar(&flags.content, "content", "mp4", "Contents to parse and output, available values: \nbox-types: supported boxes(no parse) \nnalu-types: NALU types(no parse)  \nes: AVC/HEVC elementary stream parsing data \nraw-es: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) \nboxes: MP4 boxes")
+	flag.StringVar(&flags.content, "content", "boxes", `Contents to parse and output, available values: 
+  box_types: supported boxes(no parse) 
+  nalu_types: NALU types(no parse)  
+  es: AVC/HEVC elementary stream parsing data 
+  raw_es: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) 
+  raw_annexb_es: AVC/HEVC Elementary Stream (AnnexB byte format, video elementary stream and parameter set elementary stream) 
+  boxes: MP4 boxes`)
 	flag.StringVar(&flags.format, "format", "json", "Output format, available values:json,json_newlines,yaml,csv. \nNote that 'csv' only available for 'no parse' content")
 }
 
@@ -37,9 +43,10 @@ func getFormatFlag() int {
 }
 
 const (
-	flagContentBoxes = iota // mp4 boxes
-	flagContentES           // AVC/HEVC Elementary Stream parsing data
-	flagContentRawES        // AVC/HEVC Elementary Stream (mp4 video elementary stream only, no sps/pps)
+	flagContentBoxes       = iota // mp4 boxes
+	flagContentES                 // AVC/HEVC Elementary Stream parsing data
+	flagContentRawES              // AVC/HEVC Elementary Stream (mp4 video elementary stream only, no sps/pps)
+	flagContentRawAnnexBES        // AVC/HEVC Elementary Stream (AnnexB byte format, video elementary stream and parameter set elementary stream)
 
 	// no parse needed
 	flagContentBoxTypes
@@ -50,12 +57,14 @@ func getContentFlag() int {
 	switch strings.ToLower(flags.content) {
 	case "es":
 		return flagContentES
-	case "raw-es":
+	case "raw_es":
 		return flagContentRawES
+	case "raw_annexb_es":
+		return flagContentRawAnnexBES
 
-	case "box-types":
+	case "box_types":
 		return flagContentBoxTypes
-	case "nalu-types":
+	case "nalu_types":
 		return flagContentNALUTypes
 	}
 	return flagContentBoxes
