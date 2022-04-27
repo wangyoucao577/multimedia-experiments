@@ -11,8 +11,13 @@ func main() {
 	flag.Parse()
 	defer glog.Flush()
 
-	if flags.printBoxes {
+	contentTypeFlag := getContentTypeFlag()
+
+	if contentTypeFlag == flagContentBoxTypes {
 		printBoxes(getFormatFlag())
+		return
+	} else if contentTypeFlag == flagContentNALUTypes {
+		printNALUTypes(getFormatFlag())
 		return
 	}
 
@@ -21,6 +26,6 @@ func main() {
 		exit.Fail()
 	}
 
-	parseMP4(flags.inputFilePath, getFormatFlag())
+	parseMP4(flags.inputFilePath, getFormatFlag(), contentTypeFlag)
 
 }
