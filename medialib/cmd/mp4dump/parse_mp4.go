@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -9,7 +8,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/exit"
 )
 
-func parseMP4(inputFile string, format int, contentType int) {
+func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 
 	// parse
 	m := mp4.New(inputFile)
@@ -27,22 +26,10 @@ func parseMP4(inputFile string, format int, contentType int) {
 			exit.Fail()
 		} else {
 			// print AVC ES
-			data, err := marshalByFormat(es, format)
-			if err != nil {
-				glog.Error(err)
-			} else {
-				fmt.Println(string(data))
-			}
+			return marshalByFormat(es, format)
 		}
-
-		return
 	}
 
 	// print mp4 boxes
-	data, err := marshalByFormat(m.Boxes, format)
-	if err != nil {
-		glog.Error(err)
-	} else {
-		fmt.Println(string(data))
-	}
+	return marshalByFormat(m.Boxes, format)
 }

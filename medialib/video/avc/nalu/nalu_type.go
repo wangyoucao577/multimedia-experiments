@@ -86,18 +86,27 @@ var naluTypes = map[int]TypeInfo{
 	TypeTypeUnspecified31:   {Description: "Unspecified"},
 }
 
-// TypesJSON marshalls nalu types and relerrant information to JSON.
-func TypesJSON() ([]byte, error) {
+// IsValidNALUType checks whether input NAL Unit Type is valid or not.
+func IsValidNALUType(t int) bool {
+	_, ok := naluTypes[t]
+	return ok
+}
+
+// TypesMarshaler implements util.Marshaler
+type TypesMarshaler struct{}
+
+// JSON marshalls nalu types and relerrant information to JSON.
+func (t TypesMarshaler) JSON() ([]byte, error) {
 	return json.Marshal(naluTypes)
 }
 
-// TypesJSONIndent marshalls nalu types to JSON representation with customized indent.
-func TypesJSONIndent(prefix, indent string) ([]byte, error) {
+// JSONIndent marshalls nalu types to JSON representation with customized indent.
+func (t TypesMarshaler) JSONIndent(prefix, indent string) ([]byte, error) {
 	return json.MarshalIndent(naluTypes, prefix, indent)
 }
 
-// TypesYAML formats nalu types to YAML representation.
-func TypesYAML() ([]byte, error) {
+// YAML formats nalu types to YAML representation.
+func (t TypesMarshaler) YAML() ([]byte, error) {
 	j, err := json.Marshal(naluTypes)
 	if err != nil {
 		return j, err
@@ -105,8 +114,8 @@ func TypesYAML() ([]byte, error) {
 	return yaml.JSONToYAML(j)
 }
 
-// TypesCSV marshalls all supported nalu types to csv.
-func TypesCSV() ([]byte, error) {
+// CSV marshalls all supported nalu types to csv.
+func (t TypesMarshaler) CSV() ([]byte, error) {
 	records := [][]string{
 		{"Type", "Description"}, // csv header
 	}
@@ -126,10 +135,4 @@ func TypesCSV() ([]byte, error) {
 	w.WriteAll(records)
 
 	return buf.Bytes(), w.Error()
-}
-
-// IsValidNALUType checks whether input NAL Unit Type is valid or not.
-func IsValidNALUType(t int) bool {
-	_, ok := naluTypes[t]
-	return ok
 }

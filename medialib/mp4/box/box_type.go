@@ -124,18 +124,27 @@ func BoxTypes() map[string]BasicInfo {
 	return boxTypes
 }
 
-// BoxTypesJSON marshalls supported boxes and relerrant information to JSON.
-func BoxTypesJSON() ([]byte, error) {
+// IsValidBoxType checks whether input box type is valid or not.
+func IsValidBoxType(t string) bool {
+	_, ok := boxTypes[t]
+	return ok
+}
+
+// TypesMarshaler implements util.Marshaler.
+type TypesMarshaler struct{}
+
+// JSON marshalls supported boxes and relerrant information to JSON.
+func (t TypesMarshaler) JSON() ([]byte, error) {
 	return json.Marshal(boxTypes)
 }
 
-// BoxTypesJSONIndent marshalls boxes to JSON representation with customized indent.
-func BoxTypesJSONIndent(prefix, indent string) ([]byte, error) {
+// JSONIndent marshalls boxes to JSON representation with customized indent.
+func (t TypesMarshaler) JSONIndent(prefix, indent string) ([]byte, error) {
 	return json.MarshalIndent(boxTypes, prefix, indent)
 }
 
-// BoxTypesYAML formats boxes to YAML representation.
-func BoxTypesYAML() ([]byte, error) {
+// YAML formats boxes to YAML representation.
+func (t TypesMarshaler) YAML() ([]byte, error) {
 	j, err := json.Marshal(boxTypes)
 	if err != nil {
 		return j, err
@@ -143,8 +152,8 @@ func BoxTypesYAML() ([]byte, error) {
 	return yaml.JSONToYAML(j)
 }
 
-// BoxesTypesCSV marshalls all supported boxes to csv.
-func BoxesTypesCSV() ([]byte, error) {
+// CSV marshalls all supported boxes to csv.
+func (t TypesMarshaler) CSV() ([]byte, error) {
 	records := [][]string{
 		{"Type", "Name"}, // csv header
 	}
@@ -158,10 +167,4 @@ func BoxesTypesCSV() ([]byte, error) {
 	w.WriteAll(records)
 
 	return buf.Bytes(), w.Error()
-}
-
-// IsValidBoxType checks whether input box type is valid or not.
-func IsValidBoxType(t string) bool {
-	_, ok := boxTypes[t]
-	return ok
 }
