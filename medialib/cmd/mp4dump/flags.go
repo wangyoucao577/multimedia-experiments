@@ -13,7 +13,7 @@ var flags struct {
 
 func init() {
 	flag.StringVar(&flags.inputFilePath, "i", "", "Input mp4 file path.")
-	flag.StringVar(&flags.content, "content", "mp4", "Contents to parse and output, available values: \nbox-types: supported boxes(no parse) \nnalu-types: NALU types(no parse)  \nes-parsing: AVC/HEVC elementary stream parsing data \nes: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) \nboxes: MP4 boxes")
+	flag.StringVar(&flags.content, "content", "mp4", "Contents to parse and output, available values: \nbox-types: supported boxes(no parse) \nnalu-types: NALU types(no parse)  \nes: AVC/HEVC elementary stream parsing data \nraw-es: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) \nboxes: MP4 boxes")
 	flag.StringVar(&flags.format, "format", "json", "Output format, available values:json,json_newlines,yaml,csv. \nNote that 'csv' only available for 'no parse' content")
 }
 
@@ -37,9 +37,9 @@ func getFormatFlag() int {
 }
 
 const (
-	flagContentBoxes     = iota // mp4 boxes
-	flagContentESParsing        // AVC/HEVC Elementary Stream parsing data
-	flagContentES               // AVC/HEVC Elementary Stream
+	flagContentBoxes = iota // mp4 boxes
+	flagContentES           // AVC/HEVC Elementary Stream parsing data
+	flagContentRawES        // AVC/HEVC Elementary Stream (mp4 video elementary stream only, no sps/pps)
 
 	// no parse needed
 	flagContentBoxTypes
@@ -48,10 +48,10 @@ const (
 
 func getContentFlag() int {
 	switch strings.ToLower(flags.content) {
-	case "es-parsing":
-		return flagContentESParsing
 	case "es":
 		return flagContentES
+	case "raw-es":
+		return flagContentRawES
 
 	case "box-types":
 		return flagContentBoxTypes

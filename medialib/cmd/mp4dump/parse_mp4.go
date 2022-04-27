@@ -21,13 +21,13 @@ func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 	}
 
 	// parse avc/hevc es and print
-	if contentType == flagContentESParsing || contentType == flagContentES {
+	if contentType == flagContentES || contentType == flagContentRawES {
 		if es, err := m.Boxes.ExtractES(0); err != nil {
 			glog.Errorf("Extract ES failed, err %v", err)
 			exit.Fail()
 		} else {
 			// print AVC ES
-			if contentType == flagContentES {
+			if contentType == flagContentRawES {
 				if _, err := es.Dump(os.Stdout); err != nil {
 					glog.Errorf("Dump ES failed, err %v", err)
 					exit.Fail()
