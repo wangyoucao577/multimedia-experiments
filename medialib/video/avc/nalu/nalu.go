@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/aud"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sei"
 )
 
@@ -20,7 +21,9 @@ type NALUnit struct {
 
 	RBRP []byte `json:"-"` // Raw byte sequence payloads
 
-	SEIMessage *sei.SEIMessage `json:"sei_message,omitempty"`
+	// parsed RBRP if available
+	SEIMessage          *sei.SEIMessage          `json:"sei_message,omitempty"`
+	AccessUnitDelimiter *aud.AccessUnitDelimiter `json:"access_unit_delimiter,omitempty"`
 }
 
 // Parse parses bytes to AVC NAL Unit, return parsed bytes or error.
@@ -30,7 +33,7 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 
 	// parse nalu length
 	data := make([]byte, 1)
-	if err := util.ReadOrError(r, data[:1]); err != nil {
+	if err := util.ReadOrError(r, data); err != nil {
 		return parsedBytes, err
 	} else {
 		n.ForbiddenZeroBit = (data[0] >> 7) & 0x1
@@ -87,15 +90,27 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 	}
 
 	// Parse RBRP
-	switch n.NALUnitType {
-	case TypeSEI:
-		n.SEIMessage = &sei.SEIMessage{}
-		if _, err := n.SEIMessage.Parse(bytes.NewReader(n.RBRP), len(n.RBRP)); err != nil {
+	parser := n.prepareRBRPParser()
+	if parser != nil {
+		if _, err := parser.Parse(bytes.NewReader(n.RBRP), len(n.RBRP)); err != nil {
 			return parsedBytes, fmt.Errorf("parse nalu type %d rbrp failed", n.NALUnitType)
 		}
-	default:
+	} else {
 		glog.Warningf("unknown nalu type %d, ignored", n.NALUnitType)
 	}
 
 	return parsedBytes, nil
+}
+
+func (n *NALUnit) prepareRBRPParser() NALUParser {
+	switch n.NALUnitType {
+	case TypeSEI:
+		n.SEIMessage = &sei.SEIMessage{}
+		return n.SEIMessage
+	case TypeAccessUnitDelimiter:
+		n.AccessUnitDelimiter = &aud.AccessUnitDelimiter{}
+		return n.AccessUnitDelimiter
+		// TODO: others
+	}
+	return nil
 }
