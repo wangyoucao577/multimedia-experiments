@@ -1,3 +1,5 @@
 
 # command 
 mp4dump
+*.json
+*.h264
