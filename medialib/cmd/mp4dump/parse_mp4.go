@@ -27,23 +27,11 @@ func parseMP4(inputFile string, format int, contentType int) {
 			exit.Fail()
 		} else {
 			// print AVC ES
-			var esStr []byte
-			var err error
-			switch format {
-			case flagFormatYAML:
-				esStr, err = es.YAML()
-			case flagFormatNewLines:
-				esStr, err = es.JSONIndent("", "\t")
-			case flagFormatCSV:
-				fallthrough // doesn't support at the moment, use default
-			default:
-				esStr, err = es.JSON()
-			}
-
+			data, err := marshalByFormat(es, format)
 			if err != nil {
 				glog.Error(err)
 			} else {
-				fmt.Println(string(esStr))
+				fmt.Println(string(data))
 			}
 		}
 
@@ -51,22 +39,10 @@ func parseMP4(inputFile string, format int, contentType int) {
 	}
 
 	// print mp4 boxes
-	var boxesStr []byte
-	var err error
-	switch format {
-	case flagFormatYAML:
-		boxesStr, err = m.Boxes.YAML()
-	case flagFormatNewLines:
-		boxesStr, err = m.Boxes.JSONIndent("", "\t")
-	case flagFormatCSV:
-		fallthrough // doesn't support at the moment, use default
-	default:
-		boxesStr, err = m.Boxes.JSON()
-	}
+	data, err := marshalByFormat(m.Boxes, format)
 	if err != nil {
 		glog.Error(err)
 	} else {
-		fmt.Println(string(boxesStr))
+		fmt.Println(string(data))
 	}
-
 }
