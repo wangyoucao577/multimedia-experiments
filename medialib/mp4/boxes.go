@@ -14,13 +14,18 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov"
 )
 
+// MoofMdat represents composition of one moof and one mdat, since they're stored interleavely like this.
+type MoofMdat struct {
+	Moof moof.Box `json:"moof,omitempty"`
+	Mdat mdat.Box `json:"mdat,omitempty"`
+}
+
 // Boxes represents mp4 boxes.
 type Boxes struct {
-	Ftyp *ftyp.Box  `json:"ftyp,omitempty"`
-	Free []free.Box `json:"free,omitempty"`
-	Mdat []mdat.Box `json:"mdat,omitempty"`
-	Moov *moov.Box  `json:"moov,omitempty"`
-	Moof []moof.Box `json:"moof,omitempty"`
+	Ftyp     *ftyp.Box  `json:"ftyp,omitempty"`
+	Free     []free.Box `json:"free,omitempty"`
+	Moov     *moov.Box  `json:"moov,omitempty"`
+	MoofMdat []MoofMdat `json:"moof_mdat,omitempty"` // make sure moof,mdat can be pared and stored interleavely
 
 	//TODO: other boxes
 
@@ -81,13 +86,20 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 		b.Free = append(b.Free, *createdBox.(*free.Box))
 		createdBox = &b.Free[len(b.Free)-1] // reference to the last empty free box
 	case box.TypeMdat:
-		b.Mdat = append(b.Mdat, *createdBox.(*mdat.Box))
-		createdBox = &b.Mdat[len(b.Mdat)-1]
+		if len(b.MoofMdat) > 0 {
+			if err := b.MoofMdat[len(b.MoofMdat)-1].Mdat.Validate(); err == nil { // expect error
+				glog.Warningf("expect empty mdat but got a valid one %v", b.MoofMdat[len(b.MoofMdat)-1].Mdat)
+				b.MoofMdat = append(b.MoofMdat, MoofMdat{}) // append new one to avoid lost mdat
+			}
+		}
+		b.MoofMdat[len(b.MoofMdat)-1].Mdat = *createdBox.(*mdat.Box)
+		createdBox = &b.MoofMdat[len(b.MoofMdat)-1].Mdat
 	case box.TypeMoov:
 		b.Moov = createdBox.(*moov.Box)
 	case box.TypeMoof:
-		b.Moof = append(b.Moof, *createdBox.(*moof.Box))
-		createdBox = &b.Moof[len(b.Moof)-1] // reference to the last empty moof box
+		// Moof is required present before Mdat, so always create a new one if moof encountered.
+		b.MoofMdat = append(b.MoofMdat, MoofMdat{Moof: *createdBox.(*moof.Box)})
+		createdBox = &b.MoofMdat[len(b.MoofMdat)-1].Moof // reference to the last empty moof box
 	}
 
 	return createdBox, nil
