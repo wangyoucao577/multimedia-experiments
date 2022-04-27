@@ -13,8 +13,8 @@ var flags struct {
 
 func init() {
 	flag.StringVar(&flags.inputFilePath, "i", "", "Input mp4 file path.")
-	flag.StringVar(&flags.content, "content", "mp4", "Contents to parse and output, available values: \nbox-types: supported boxes(no parse) \nnalu-types: NALU types(no parse)  \nes-parsing: AVC/HEVC elementary stream parsing data \nes: AVC/HEVC elementary stream \nboxes: MP4 boxes")
-	flag.StringVar(&flags.format, "format", "json", "Output format, available values:json,json_newlines,yaml,csv. \nNote that 'csv' only available for 'print-boxes'")
+	flag.StringVar(&flags.content, "content", "mp4", "Contents to parse and output, available values: \nbox-types: supported boxes(no parse) \nnalu-types: NALU types(no parse)  \nes-parsing: AVC/HEVC elementary stream parsing data \nes: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) \nboxes: MP4 boxes")
+	flag.StringVar(&flags.format, "format", "json", "Output format, available values:json,json_newlines,yaml,csv. \nNote that 'csv' only available for 'no parse' content")
 }
 
 const (

@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"os"
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4"
@@ -19,14 +20,22 @@ func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 		}
 	}
 
-	// parse avc es and print
-	if contentType == flagContentESParsing {
+	// parse avc/hevc es and print
+	if contentType == flagContentESParsing || contentType == flagContentES {
 		if es, err := m.Boxes.ExtractES(0); err != nil {
 			glog.Errorf("Extract ES failed, err %v", err)
 			exit.Fail()
 		} else {
 			// print AVC ES
-			return marshalByFormat(es, format)
+			if contentType == flagContentES {
+				if _, err := es.Dump(os.Stdout); err != nil {
+					glog.Errorf("Dump ES failed, err %v", err)
+					exit.Fail()
+				}
+				return nil, nil
+			} else {
+				return marshalByFormat(es, format)
+			}
 		}
 	}
 

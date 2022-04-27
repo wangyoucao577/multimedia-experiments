@@ -134,6 +134,10 @@ func (b *Boxes) ParsePayload(r io.Reader) error {
 // Use trackID to select the specified one, trackID <= 0 means use the first found one.
 func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
 
+	if b.Moov == nil || b.MoofMdat == nil {
+		return nil, fmt.Errorf("moov, moof or mdat not found")
+	}
+
 	trackFound := false
 	e := es.ElementaryStream{}
 	for _, track := range b.Moov.Trak {

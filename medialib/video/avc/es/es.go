@@ -96,3 +96,37 @@ func (e *ElementaryStream) YAML() ([]byte, error) {
 func (e *ElementaryStream) CSV() ([]byte, error) {
 	return nil, fmt.Errorf("csv representation does not support yet")
 }
+
+// Dump dumps raw data into io.Writer.
+func (e *ElementaryStream) Dump(w io.Writer) (int, error) {
+	if e.LengthSize == 0 || e.LengthSize > 4 {
+		return 0, fmt.Errorf("invalid elementary stream")
+	}
+
+	var writedBytes int
+
+	for i := range e.LengthNALU {
+		// data := []byte{0x00, 0x00, 0x00, 0x01}
+		data := make([]byte, 4)
+		binary.BigEndian.PutUint32(data, e.LengthNALU[i].Length)
+		data = data[4-e.LengthSize:]
+		if n, err := w.Write(data); err != nil {
+			return writedBytes, err
+		} else if n != len(data) {
+			return writedBytes, fmt.Errorf("write bytes unmatch, expect(%d) != actual(%d)", len(data), n)
+		} else {
+			writedBytes += n
+		}
+
+		rsbp := e.LengthNALU[i].NALU.Raw()
+		if n, err := w.Write(rsbp); err != nil {
+			return writedBytes, err
+		} else if n != len(rsbp) {
+			return writedBytes, fmt.Errorf("write bytes unmatch, expect(%d) != actual(%d)", len(data), n)
+		} else {
+			writedBytes += n
+		}
+	}
+
+	return writedBytes, nil
+}

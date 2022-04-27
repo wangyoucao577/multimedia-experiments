@@ -14,12 +14,11 @@ import (
 
 // NALUnit represents AVC NAL Unit that defined in ISO/IEC-14496-10 7.3.1.
 type NALUnit struct {
-	ForbiddenZeroBit uint8 `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
-	NALRefIdc        uint8 `json:"nal_ref_idc"`        // 2 bits
-	NALUnitType      uint8 `json:"nal_unit_type"`      // 5 bits
-	//TODO: nal_unit_header_svc_extension
-
-	RBRP []byte `json:"-"` // Raw byte sequence payloads
+	ForbiddenZeroBit          uint8  `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
+	NALRefIdc                 uint8  `json:"nal_ref_idc"`        // 2 bits
+	NALUnitType               uint8  `json:"nal_unit_type"`      // 5 bits
+	nalUnitHeaderSvcExtension []byte `json:"-"`                  // TODO: parse nal_unit_header_svc_extension
+	RBRP                      []byte `json:"-"`                  // Raw byte sequence payloads
 
 	// parsed RBRP if available
 	SEIMessage          *sei.SEIMessage          `json:"sei_message,omitempty"`
@@ -54,7 +53,8 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 	if n.NALUnitType == TypePrefix || n.NALUnitType == TypeSliceExtersion {
 		glog.Warningf("nalu type %d svc_extension_flag and nal_unit_header_svc_extension parsing TODO", n.NALUnitType)
 		//TODO: parse payload
-		if err := util.ReadOrError(r, make([]byte, 2)); err != nil {
+		n.nalUnitHeaderSvcExtension = make([]byte, 2)
+		if err := util.ReadOrError(r, n.nalUnitHeaderSvcExtension); err != nil {
 			return parsedBytes, err
 		} else {
 			parsedBytes += 2
@@ -113,4 +113,15 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 		// TODO: others
 	}
 	return nil
+}
+
+// Raw translates to raw bytes data.
+func (n *NALUnit) Raw() []byte {
+	firstBytes := byte((n.NALRefIdc << 5) | (n.NALUnitType))
+
+	data := []byte{firstBytes}
+	if len(n.nalUnitHeaderSvcExtension) > 0 {
+		data = append(data, n.nalUnitHeaderSvcExtension...)
+	}
+	return append(data, n.RBRP...)
 }
