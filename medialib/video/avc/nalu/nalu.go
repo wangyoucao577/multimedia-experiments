@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sei"
 )
 
 // NALUnit represents AVC NAL Unit that defined in ISO/IEC-14496-10 7.3.1.
@@ -18,6 +19,8 @@ type NALUnit struct {
 	//TODO: nal_unit_header_svc_extension
 
 	RBRP []byte `json:"-"` // Raw byte sequence payloads
+
+	SEIMessage *sei.SEIMessage `json:"sei_message,omitempty"`
 }
 
 // Parse parses bytes to AVC NAL Unit, return parsed bytes or error.
@@ -81,6 +84,17 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 
 	if len(next24Bits) > 0 {
 		n.RBRP = append(n.RBRP, next24Bits...)
+	}
+
+	// Parse RBRP
+	switch n.NALUnitType {
+	case TypeSEI:
+		n.SEIMessage = &sei.SEIMessage{}
+		if _, err := n.SEIMessage.Parse(bytes.NewReader(n.RBRP), len(n.RBRP)); err != nil {
+			return parsedBytes, fmt.Errorf("parse nalu type %d rbrp failed", n.NALUnitType)
+		}
+	default:
+		glog.Warningf("unknown nalu type %d, ignored", n.NALUnitType)
 	}
 
 	return parsedBytes, nil
