@@ -143,7 +143,7 @@ func BoxTypesYAML() ([]byte, error) {
 	return yaml.JSONToYAML(j)
 }
 
-// Print prints all supported boxes.
+// BoxesTypesCSV marshalls all supported boxes to csv.
 func BoxesTypesCSV() ([]byte, error) {
 	records := [][]string{
 		{"Type", "Name"}, // csv header
