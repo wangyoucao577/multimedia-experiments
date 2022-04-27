@@ -8,20 +8,19 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
 )
 
 // LengthNALU represents a length and nalu composition.
 type LengthNALU struct {
-	Length uint32    `json:"length"`
-	NALU   nalu.NALU `json:"nalu"`
+	Length uint32       `json:"length"`
+	NALU   nalu.NALUnit `json:"nalu"`
 }
 
 // ElementaryStream represents AVC Elementary Stream.
 type ElementaryStream struct {
-	LengthNALU []LengthNALU
+	LengthNALU []LengthNALU `json:"length_nalu"`
 
 	LengthSize uint32 `json:"length_size"`
 }
@@ -60,10 +59,10 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 			parsedBytes += uint64(e.LengthSize)
 		}
 
-		glog.Warningf("nalu bytes %d parsing TODO", ln.Length)
-		//TODO: parse payload
-		if err := util.ReadOrError(r, make([]byte, ln.Length)); err != nil {
+		if bytes, err := ln.NALU.Parse(r, int(ln.Length)); err != nil {
 			return parsedBytes, err
+		} else {
+			parsedBytes += bytes
 		}
 
 		e.LengthNALU = append(e.LengthNALU, ln)

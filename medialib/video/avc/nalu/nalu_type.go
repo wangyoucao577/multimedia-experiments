@@ -127,3 +127,9 @@ func TypesCSV() ([]byte, error) {
 
 	return buf.Bytes(), w.Error()
 }
+
+// IsValidNALUType checks whether input NAL Unit Type is valid or not.
+func IsValidNALUType(t int) bool {
+	_, ok := naluTypes[t]
+	return ok
+}
