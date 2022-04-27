@@ -1,7 +1,9 @@
 package mp4
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/ghodss/yaml"
@@ -12,6 +14,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/mdat"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moof"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4/box/moov"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/es"
 )
 
 // MoofMdat represents composition of one moof and one mdat, since they're stored interleavely like this.
@@ -63,6 +66,11 @@ func (b Boxes) YAML() ([]byte, error) {
 		return j, err
 	}
 	return yaml.JSONToYAML(j)
+}
+
+// CSV formats boxes to CSV representation, which isn't supported at the moment.
+func (b Boxes) CSV() ([]byte, error) {
+	return nil, fmt.Errorf("csv representation does not support yet")
 }
 
 // CreateSubBox creates directly included box, such as create `mvhd` in `moov`, or create `moov` on top level.
@@ -120,4 +128,49 @@ func (b *Boxes) ParsePayload(r io.Reader) error {
 	}
 
 	return nil
+}
+
+// ExtractES extracts AVC or HEVC Elementary Stream.
+// Use trackID to select the specified one, trackID <= 0 means use the first found one.
+func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
+
+	trackFound := false
+	e := es.ElementaryStream{}
+	for _, track := range b.Moov.Trak {
+		if track.Mdia.Hdlr.HandlerType.String() == box.TypeVide {
+			if trackID > 0 && uint32(trackID) != track.Tkhd.TrackID {
+				continue
+			}
+			if trackID <= 0 {
+				trackID = int(track.Tkhd.TrackID)
+			}
+			trackFound = true
+			e.SetLengthSize(uint32(track.Mdia.Minf.Stbl.Stsd.AVC1SampleEntries[0].AVCConfig.AVCConfig.LengthSize()))
+			break
+		}
+	}
+
+	if !trackFound {
+		return nil, fmt.Errorf("trackID %d not found", trackID)
+	}
+
+	for i := 0; i < len(b.MoofMdat); i++ {
+		for _, tf := range b.MoofMdat[i].Moof.Traf {
+			if int(tf.Tfhd.TrackID) != trackID {
+				continue
+			}
+
+			for _, tr := range tf.Trun {
+				var startPos uint32
+				for _, sampleSize := range tr.SampleSize {
+					data := b.MoofMdat[i].Mdat.Data[startPos : startPos+sampleSize]
+					e.Parse(bytes.NewReader(data), len(data))
+					startPos += sampleSize
+				}
+			}
+			break
+		}
+	}
+
+	return &e, nil
 }

@@ -5,9 +5,11 @@ package es
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 
+	"github.com/ghodss/yaml"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
 )
@@ -69,4 +71,28 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 	}
 
 	return parsedBytes, nil
+}
+
+// JSON marshals elementary stream to JSON representation
+func (e *ElementaryStream) JSON() ([]byte, error) {
+	return json.Marshal(e)
+}
+
+// JSONIndent marshals elementary stream to JSON representation with customized indent.
+func (e *ElementaryStream) JSONIndent(prefix, indent string) ([]byte, error) {
+	return json.MarshalIndent(e, prefix, indent)
+}
+
+// YAML formats elementary stream to YAML representation.
+func (e *ElementaryStream) YAML() ([]byte, error) {
+	j, err := json.Marshal(e)
+	if err != nil {
+		return j, err
+	}
+	return yaml.JSONToYAML(j)
+}
+
+// CSV formats boxes to CSV representation, which isn't supported at the moment.
+func (e *ElementaryStream) CSV() ([]byte, error) {
+	return nil, fmt.Errorf("csv representation does not support yet")
 }

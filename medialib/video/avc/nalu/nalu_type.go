@@ -15,7 +15,7 @@ type TypeInfo struct {
 	Description string `json:"description"`
 }
 
-// NALU Type Codez, defined in ISO/IEC-14496-10 7.4.1
+// NALU Type Codes, defined in ISO/IEC-14496-10 7.4.1
 const (
 	TypeUnspecified = iota
 	TypeNonIDR
