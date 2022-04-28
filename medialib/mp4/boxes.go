@@ -20,8 +20,8 @@ import (
 
 // MoofMdat represents composition of one moof and one mdat, since they're stored interleavely like this.
 type MoofMdat struct {
-	Moof moof.Box `json:"moof,omitempty"`
-	Mdat mdat.Box `json:"mdat,omitempty"`
+	Moof moof.Box `json:"moof"`
+	Mdat mdat.Box `json:"mdat"`
 }
 
 // Boxes represents mp4 boxes.
@@ -29,7 +29,8 @@ type Boxes struct {
 	Ftyp     *ftyp.Box  `json:"ftyp,omitempty"`
 	Free     []free.Box `json:"free,omitempty"`
 	Moov     *moov.Box  `json:"moov,omitempty"`
-	MoofMdat []MoofMdat `json:"moof_mdat,omitempty"` // make sure moof,mdat can be pared and stored interleavely
+	MoofMdat []MoofMdat `json:"moof_mdat,omitempty"` // for fmp4, make sure moof,mdat can be pared and stored interleavely
+	Mdat     []mdat.Box `json:"mdat,omitempty"`      // for  mp4 that doesn't have moof
 
 	//TODO: other boxes
 
@@ -100,9 +101,13 @@ func (b *Boxes) CreateSubBox(h box.Header) (box.Box, error) {
 				glog.Warningf("expect empty mdat but got a valid one %v", b.MoofMdat[len(b.MoofMdat)-1].Mdat)
 				b.MoofMdat = append(b.MoofMdat, MoofMdat{}) // append new one to avoid lost mdat
 			}
+
+			b.MoofMdat[len(b.MoofMdat)-1].Mdat = *createdBox.(*mdat.Box)
+			createdBox = &b.MoofMdat[len(b.MoofMdat)-1].Mdat
+		} else if len(b.MoofMdat) == 0 {
+			b.Mdat = append(b.Mdat, *createdBox.(*mdat.Box))
+			createdBox = &b.Mdat[len(b.Mdat)-1]
 		}
-		b.MoofMdat[len(b.MoofMdat)-1].Mdat = *createdBox.(*mdat.Box)
-		createdBox = &b.MoofMdat[len(b.MoofMdat)-1].Mdat
 	case box.TypeMoov:
 		b.Moov = createdBox.(*moov.Box)
 	case box.TypeMoof:
