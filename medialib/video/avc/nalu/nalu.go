@@ -3,6 +3,7 @@ package nalu
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -15,16 +16,64 @@ import (
 
 // NALUnit represents AVC NAL Unit that defined in ISO/IEC-14496-10 7.3.1.
 type NALUnit struct {
-	ForbiddenZeroBit          uint8  `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
-	NALRefIdc                 uint8  `json:"nal_ref_idc"`        // 2 bits
-	NALUnitType               uint8  `json:"nal_unit_type"`      // 5 bits
-	nalUnitHeaderSvcExtension []byte `json:"-"`                  // TODO: parse nal_unit_header_svc_extension
-	RBRP                      []byte `json:"-"`                  // Raw byte sequence payloads
+	ForbiddenZeroBit uint8 `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
+	NALRefIdc        uint8 `json:"nal_ref_idc"`        // 2 bits
+	NALUnitType      uint8 `json:"nal_unit_type"`      // 5 bits
+
+	nalUnitHeaderSvcExtension []byte `json:"-"` // TODO: parse nal_unit_header_svc_extension
+
+	RBRP []byte `json:"-"` // Raw byte sequence payloads
 
 	// parsed RBRP if available
-	SEIMessage          *sei.SEIMessage               `json:"sei_message,omitempty"`
-	AccessUnitDelimiter *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
-	SPS                 *sps.SequenceParameterSetData `json:"sps,omitempty"`
+	SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
+	AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
+	SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler.
+func (n *NALUnit) MarshalJSON() ([]byte, error) {
+	var nj = struct {
+		ForbiddenZeroBit       uint8  `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
+		NALRefIdc              uint8  `json:"nal_ref_idc"`        // 2 bits
+		NALUnitType            uint8  `json:"nal_unit_type"`      // 5 bits
+		NALUnitTypeDescription string `json:"nal_unit_type_description"`
+
+		nalUnitHeaderSvcExtension []byte `json:"-"` // TODO: parse nal_unit_header_svc_extension
+
+		// raw bytes and raw bytes sequence payloads
+		RawBytes []byte `json:"raw_bytes,omitempty"`
+		RBRP     []byte `json:"rbrb,omitempty"` // Raw byte sequence payloads
+
+		// parsed RBRP data
+		SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
+		AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
+		SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
+	}{
+		ForbiddenZeroBit:       n.ForbiddenZeroBit,
+		NALRefIdc:              n.NALRefIdc,
+		NALUnitType:            n.NALUnitType,
+		NALUnitTypeDescription: TypeDescription(int(n.NALUnitType)),
+
+		nalUnitHeaderSvcExtension: n.nalUnitHeaderSvcExtension,
+
+		// RBRP: b.RBRP, // set by type
+
+		SEIMessage:               n.SEIMessage,
+		AccessUnitDelimiter:      n.AccessUnitDelimiter,
+		SequenceParameterSetData: n.SequenceParameterSetData,
+	}
+
+	switch n.NALUnitType {
+	case TypeSEI:
+		fallthrough
+	case TypeAccessUnitDelimiter:
+		fallthrough
+	case TypeSPS:
+		nj.RawBytes = n.Raw()
+		nj.RBRP = n.RBRP
+	}
+
+	return json.Marshal(nj)
 }
 
 // Parse parses bytes to AVC NAL Unit, return parsed bytes or error.
@@ -113,8 +162,8 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 		n.AccessUnitDelimiter = &aud.AccessUnitDelimiter{}
 		return n.AccessUnitDelimiter
 	case TypeSPS:
-		n.SPS = &sps.SequenceParameterSetData{}
-		return n.SPS
+		n.SequenceParameterSetData = &sps.SequenceParameterSetData{}
+		return n.SequenceParameterSetData
 
 		// TODO: others
 	}

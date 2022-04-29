@@ -86,6 +86,15 @@ var naluTypes = map[int]TypeInfo{
 	TypeTypeUnspecified31:   {Description: "Unspecified"},
 }
 
+// TypeDescription represents nalu type description.
+func TypeDescription(t int) string {
+	n, ok := naluTypes[t]
+	if !ok {
+		return ""
+	}
+	return n.Description
+}
+
 // IsValidNALUType checks whether input NAL Unit Type is valid or not.
 func IsValidNALUType(t int) bool {
 	_, ok := naluTypes[t]
