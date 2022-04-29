@@ -10,6 +10,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/aud"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sei"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
 
 // NALUnit represents AVC NAL Unit that defined in ISO/IEC-14496-10 7.3.1.
@@ -21,8 +22,9 @@ type NALUnit struct {
 	RBRP                      []byte `json:"-"`                  // Raw byte sequence payloads
 
 	// parsed RBRP if available
-	SEIMessage          *sei.SEIMessage          `json:"sei_message,omitempty"`
-	AccessUnitDelimiter *aud.AccessUnitDelimiter `json:"access_unit_delimiter,omitempty"`
+	SEIMessage          *sei.SEIMessage               `json:"sei_message,omitempty"`
+	AccessUnitDelimiter *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
+	SPS                 *sps.SequenceParameterSetData `json:"sps,omitempty"`
 }
 
 // Parse parses bytes to AVC NAL Unit, return parsed bytes or error.
@@ -110,6 +112,10 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 	case TypeAccessUnitDelimiter:
 		n.AccessUnitDelimiter = &aud.AccessUnitDelimiter{}
 		return n.AccessUnitDelimiter
+	case TypeSPS:
+		n.SPS = &sps.SequenceParameterSetData{}
+		return n.SPS
+
 		// TODO: others
 	}
 	return nil
