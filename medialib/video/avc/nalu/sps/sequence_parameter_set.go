@@ -345,22 +345,28 @@ func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) 
 	}
 
 	if s.VuiParametersPresentFlag != 0 {
-		// s.VUIParameters = &VUIParameters{}
-		// if costBits, err := s.VUIParameters.parse(r, remainBits, numOfRemainBits); err != nil {
-		// 	return parsedBytes, err
-		// } else {
-		// 	nextCostBits += costBits
-		// }
+		s.VUIParameters = &VUIParameters{}
+		if costBits, err := s.VUIParameters.parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
+		} else {
+			parsedBits += costBits
+		}
+	}
+
+	if br.CachedBitsCount() > 0 {
+		ignoreBits := uint(br.CachedBitsCount())
+		if _, err := br.ReadBits(ignoreBits); err != nil { // ignore rbsp_stop_one_bit and several rbsp_alignment_zero_bit
+			return parsedBits / bitsPerByte, err
+		} else {
+			parsedBits += uint64(ignoreBits)
+		}
 	}
 
 	// bits to bytes
 	parsedBytes := parsedBits / bitsPerByte
 	if parsedBits%bitsPerByte != 0 {
-		glog.Warningf("bits start from seq_parameter_set_id doesn't align in 8 bits, total %d bits", parsedBits)
+		glog.Warningf("parsed bits doesn't align in 8 bits, total %d bits", parsedBits)
 		parsedBytes += 1
-	}
-	if br.CachedBitsCount() > 0 {
-		glog.Warningf("bitreader still has %d bits cached", br.CachedBitsCount())
 	}
 
 	if int(parsedBytes) != size {

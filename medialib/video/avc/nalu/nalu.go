@@ -16,6 +16,8 @@ import (
 
 // NALUnit represents AVC NAL Unit that defined in ISO/IEC-14496-10 7.3.1.
 type NALUnit struct {
+	RawBytes []byte `json:"-"` // store raw bytes
+
 	ForbiddenZeroBit uint8 `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
 	NALRefIdc        uint8 `json:"nal_ref_idc"`        // 2 bits
 	NALUnitType      uint8 `json:"nal_unit_type"`      // 5 bits
@@ -33,6 +35,8 @@ type NALUnit struct {
 // MarshalJSON implements json.Marshaler.
 func (n *NALUnit) MarshalJSON() ([]byte, error) {
 	var nj = struct {
+		RawBytes []byte `json:"raw_bytes,omitempty"`
+
 		ForbiddenZeroBit       uint8  `json:"forbidden_zero_bit"` // 1 bit, shoule be 0 always
 		NALRefIdc              uint8  `json:"nal_ref_idc"`        // 2 bits
 		NALUnitType            uint8  `json:"nal_unit_type"`      // 5 bits
@@ -41,14 +45,15 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		nalUnitHeaderSvcExtension []byte `json:"-"` // TODO: parse nal_unit_header_svc_extension
 
 		// raw bytes and raw bytes sequence payloads
-		RawBytes []byte `json:"raw_bytes,omitempty"`
-		RBRP     []byte `json:"rbrb,omitempty"` // Raw byte sequence payloads
+		RBRP []byte `json:"rbrb,omitempty"` // Raw byte sequence payloads
 
 		// parsed RBRP data
 		SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
 		AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
 		SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
 	}{
+		// RawBytes:               n.RawBytes, // set by type
+
 		ForbiddenZeroBit:       n.ForbiddenZeroBit,
 		NALRefIdc:              n.NALRefIdc,
 		NALUnitType:            n.NALUnitType,
@@ -69,7 +74,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 	case TypeAccessUnitDelimiter:
 		fallthrough
 	case TypeSPS:
-		nj.RawBytes = n.Raw()
+		nj.RawBytes = n.RawBytes
 		nj.RBRP = n.RBRP
 	}
 
@@ -86,6 +91,7 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 	if err := util.ReadOrError(r, data); err != nil {
 		return parsedBytes, err
 	} else {
+		n.RawBytes = append(n.RawBytes, data...)
 		n.ForbiddenZeroBit = (data[0] >> 7) & 0x1
 		n.NALRefIdc = (data[0] >> 5) & 0x3
 		n.NALUnitType = data[0] & 0x1F
@@ -108,37 +114,20 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 		if err := util.ReadOrError(r, n.nalUnitHeaderSvcExtension); err != nil {
 			return parsedBytes, err
 		} else {
+			n.RawBytes = append(n.RawBytes, n.nalUnitHeaderSvcExtension...)
 			parsedBytes += 2
 			nalUnitHeaderBytes += 2
 		}
 	}
 
-	next24Bits := []byte{}
-	for i := nalUnitHeaderBytes; i < size; i++ {
-
-		oneBytes := make([]byte, 1)
-		if err := util.ReadOrError(r, oneBytes); err != nil {
-			return parsedBytes, err
-		} else {
-			next24Bits = append(next24Bits, oneBytes...)
-			if len(next24Bits) == 3 {
-				if bytes.Equal(next24Bits, []byte{0x00, 0x00, 0x30}) {
-					n.RBRP = append(n.RBRP, next24Bits[:2]...)
-					next24Bits = next24Bits[3:] // ignore the emulation_prevention_three_byte 0x30
-				} else {
-					n.RBRP = append(n.RBRP, next24Bits[0])
-					next24Bits = next24Bits[1:]
-				}
-			}
-
-			parsedBytes += 1
-		}
-
+	n.RBRP = make([]byte, size-nalUnitHeaderBytes)
+	if err := util.ReadOrError(r, n.RBRP); err != nil {
+		return parsedBytes, err
+	} else {
+		n.RawBytes = append(n.RawBytes, n.RBRP...)
+		parsedBytes += uint64(size - nalUnitHeaderBytes)
 	}
-
-	if len(next24Bits) > 0 {
-		n.RBRP = append(n.RBRP, next24Bits...)
-	}
+	n.RBRP = getRBRP(n.RBRP)
 
 	// Parse RBRP
 	parser := n.prepareRBRPParser()
@@ -172,11 +161,25 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 
 // Raw translates to raw bytes data.
 func (n *NALUnit) Raw() []byte {
-	firstBytes := byte((n.NALRefIdc << 5) | (n.NALUnitType))
+	return n.RawBytes
+}
 
-	data := []byte{firstBytes}
-	if len(n.nalUnitHeaderSvcExtension) > 0 {
-		data = append(data, n.nalUnitHeaderSvcExtension...)
+// raw RBRP -> RBRP, remove emulation_prevention_three_byte 0x03
+func getRBRP(rbrpBytes []byte) []byte {
+	numBytesOfRBRP := len(rbrpBytes)
+
+	rbrp := []byte{}
+	for i := 0; i < numBytesOfRBRP; i++ {
+		if i+2 < numBytesOfRBRP &&
+			rbrpBytes[i] == 0x00 &&
+			rbrpBytes[i+1] == 0x00 &&
+			rbrpBytes[i+2] == 0x03 {
+			rbrp = append(rbrp, rbrpBytes[i], rbrpBytes[i+1])
+			i += 2
+			// ignore emulation_prevention_three_byte, equal to 0x03
+		} else {
+			rbrp = append(rbrp, rbrpBytes[i])
+		}
 	}
-	return append(data, n.RBRP...)
+	return rbrp
 }
