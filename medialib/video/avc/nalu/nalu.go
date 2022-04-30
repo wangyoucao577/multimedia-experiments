@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/aud"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/pps"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sei"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
@@ -30,6 +31,7 @@ type NALUnit struct {
 	SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
 	AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
 	SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
+	PictureParameterSet      *pps.PictureParameterSet      `json:"picture_parameter_set,omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -51,6 +53,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
 		AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
 		SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
+		PictureParameterSet      *pps.PictureParameterSet      `json:"picture_parameter_set,omitempty"`
 	}{
 		// RawBytes:               n.RawBytes, // set by type
 
@@ -66,6 +69,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		SEIMessage:               n.SEIMessage,
 		AccessUnitDelimiter:      n.AccessUnitDelimiter,
 		SequenceParameterSetData: n.SequenceParameterSetData,
+		PictureParameterSet:      n.PictureParameterSet,
 	}
 
 	switch n.NALUnitType {
@@ -74,6 +78,8 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 	case TypeAccessUnitDelimiter:
 		fallthrough
 	case TypeSPS:
+		fallthrough
+	case TypePPS:
 		nj.RawBytes = n.RawBytes
 		nj.RBSP = n.RBSP
 	}
@@ -153,6 +159,10 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 	case TypeSPS:
 		n.SequenceParameterSetData = &sps.SequenceParameterSetData{}
 		return n.SequenceParameterSetData
+	case TypePPS:
+		n.PictureParameterSet = &pps.PictureParameterSet{}
+		n.PictureParameterSet.SetSPS(n.SequenceParameterSetData)
+		return n.PictureParameterSet
 
 		// TODO: others
 	}

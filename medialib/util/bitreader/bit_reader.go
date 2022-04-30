@@ -45,21 +45,18 @@ func (r *Reader) ReadBit() (byte, error) {
 // ReadBits reads count specified bits, return error if occurred.
 func (r *Reader) ReadBits(count uint) ([]byte, error) {
 	bits := []byte{}
-	var nextByte byte
-	var nextByteBitsCount int
+	bitsIndex := -1
 
 	for i := 0; i < int(count); i++ {
+		if i%bitsPerByte == 0 {
+			bits = append(bits, 0)
+			bitsIndex++
+		}
+
 		if nextBit, err := r.ReadBit(); err != nil {
 			return nil, err
 		} else {
-			nextByte = (nextByte << 1) | nextBit
-			nextByteBitsCount++
-		}
-
-		if nextByteBitsCount == bitsPerByte {
-			bits = append(bits, nextByte)
-			nextByte = 0
-			nextByteBitsCount = 0
+			bits[bitsIndex] = (bits[bitsIndex] << 1) | nextBit
 		}
 	}
 	return bits, nil

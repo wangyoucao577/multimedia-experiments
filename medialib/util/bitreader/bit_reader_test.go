@@ -30,6 +30,38 @@ func TestReadBit(t *testing.T) {
 	}
 }
 
+func TestReadBits(t *testing.T) {
+	cases := []struct {
+		count int
+		in    []byte
+		out   []byte
+	}{
+		{count: 1, in: []byte{0xAA}, out: []byte{0x1}},
+		{count: 2, in: []byte{0xAA}, out: []byte{0x2}},
+		{count: 3, in: []byte{0xAA}, out: []byte{0x5}},
+		{count: 4, in: []byte{0xAA}, out: []byte{0xA}},
+		{count: 5, in: []byte{0xAA}, out: []byte{0x15}},
+		{count: 6, in: []byte{0xAA}, out: []byte{0x2A}},
+		{count: 7, in: []byte{0xAA}, out: []byte{0x55}},
+		{count: 8, in: []byte{0xAA}, out: []byte{0xAA}},
+
+		{count: 1, in: []byte{0xAA, 0xFF}, out: []byte{0x1}},
+		{count: 8, in: []byte{0xAA, 0xFF}, out: []byte{0xAA}},
+		{count: 9, in: []byte{0xAA, 0xFF}, out: []byte{0xAA, 0x1}},
+	}
+
+	for _, c := range cases {
+		r := bytes.NewReader(c.in)
+		br := New(r)
+
+		if nextBits, err := br.ReadBits(uint(c.count)); err != nil {
+			t.Error(err)
+		} else if !bytes.Equal(nextBits, c.out) {
+			t.Errorf("read %d bits on %v expect %v but got %v", c.count, c.in, c.out, nextBits)
+		}
+	}
+}
+
 func TestReadBytes(t *testing.T) {
 	cases := []struct {
 		count int
