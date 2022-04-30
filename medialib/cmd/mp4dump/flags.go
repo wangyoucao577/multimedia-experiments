@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strings"
+
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/marshaler"
 )
 
 var flags struct {
@@ -20,26 +23,7 @@ func init() {
   raw_es: AVC/HEVC elementary stream(mp4 video elementary stream only, no sps/pps) 
   raw_annexb_es: AVC/HEVC Elementary Stream (AnnexB byte format, video elementary stream and parameter set elementary stream) 
   boxes: MP4 boxes`)
-	flag.StringVar(&flags.format, "format", "json", "Output format, available values:json,json_newlines,yaml,csv. \nNote that 'csv' only available for 'no parse' content")
-}
-
-const (
-	flagFormatJSON = iota
-	flagFormatNewLines
-	flagFormatYAML
-	flagFormatCSV
-)
-
-func getFormatFlag() int {
-	switch strings.ToLower(flags.format) {
-	case "yaml":
-		return flagFormatYAML
-	case "json_newlines":
-		return flagFormatNewLines
-	case "csv":
-		return flagFormatCSV
-	}
-	return flagFormatJSON
+	flag.StringVar(&flags.format, "format", "json", fmt.Sprintf("Output format, available values:%s", marshaler.FormatsHelper()))
 }
 
 const (

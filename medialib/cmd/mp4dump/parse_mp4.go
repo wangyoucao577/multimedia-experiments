@@ -7,9 +7,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/mp4"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/exit"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/marshaler"
 )
 
-func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
+func parseMP4(inputFile string, format marshaler.Format, contentType int) ([]byte, error) {
 
 	// parse
 	m := mp4.New(inputFile)
@@ -34,7 +35,7 @@ func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 				}
 				return nil, nil
 			} else {
-				return marshalByFormat(es, format)
+				return marshaler.Marshal(es, format)
 			}
 		}
 	}
@@ -55,5 +56,5 @@ func parseMP4(inputFile string, format int, contentType int) ([]byte, error) {
 	}
 
 	// print mp4 boxes
-	return marshalByFormat(m.Boxes, format)
+	return marshaler.Marshal(m.Boxes, format)
 }

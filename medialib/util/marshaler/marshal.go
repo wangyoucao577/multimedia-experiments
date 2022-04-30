@@ -1,4 +1,9 @@
-package util
+// Package marshaler provides marshal by various format.
+package marshaler
+
+import (
+	"fmt"
+)
 
 // Marshaler defines serveral Marshal interfaces in one place.
 type Marshaler interface {
@@ -14,4 +19,21 @@ type Marshaler interface {
 
 	// CSV marshals object to CSV representation.
 	CSV() ([]byte, error)
+}
+
+// Marshal marshals data by format.
+func Marshal(m Marshaler, f Format) ([]byte, error) {
+	switch f {
+	case FormatYAML:
+		return m.YAML()
+	case FormatJSON:
+		return m.JSON()
+	case FormatJSONNewLines:
+		return m.JSONIndent("", "\t")
+	case FormatCSV:
+		return m.CSV()
+	}
+
+	// default
+	return nil, fmt.Errorf("unknown format %d", f)
 }
