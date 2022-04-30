@@ -118,34 +118,38 @@ func (a *AVCDecoderConfigurationRecord) parse(r io.Reader) (uint64, error) {
 		}
 	}
 
-	// TODO: Need to check profile_idc
-	// if err := util.ReadOrError(r, data); err != nil {
-	// 	return parsedBytes, err
-	// } else {
-	// 	a.ChromaFormat = data[0] & 0x3
-	// 	a.BitDepthLumaMinus8 = data[1] & 0x7
-	// 	a.BitDepthChromaMinus8 = data[2] & 0x7
-	// 	a.NumOfSequenceParameterSetExt = data[3]
+	// ISO/IEC-14496-15 5.2.4.1
+	// But seems not work, try it out if need
+	// if a.AVCProfileIndication == 100 || a.AVCProfileIndication == 110 ||
+	// 	a.AVCProfileIndication == 122 || a.AVCProfileIndication == 144 {
 
-	// 	parsedBytes += 4
-	// }
-
-	// for i := 0; i < int(a.NumOfSequenceParameterSetExt); i++ {
-	// 	var len uint16
-	// 	if err := util.ReadOrError(r, data[:2]); err != nil {
+	// 	if err := util.ReadOrError(r, data); err != nil {
 	// 		return parsedBytes, err
 	// 	} else {
-	// 		len = binary.BigEndian.Uint16(data[:2])
-	// 		a.SequenceParameterSetExtLength = append(a.SequenceParameterSetExtLength, len)
-	// 		parsedBytes += 2
+	// 		a.ChromaFormat = data[0] & 0x3
+	// 		a.BitDepthLumaMinus8 = data[1] & 0x7
+	// 		a.BitDepthChromaMinus8 = data[2] & 0x7
+	// 		a.NumOfSequenceParameterSetExt = data[3]
+
+	// 		parsedBytes += 4
 	// 	}
 
-	// 	nal := make([]byte, len)
-	// 	if err := util.ReadOrError(r, nal); err != nil {
-	// 		return parsedBytes, err
-	// 	} else {
-	// 		a.SequenceParameterSetExtNALUnit = append(a.SequenceParameterSetExtNALUnit, nal)
-	// 		parsedBytes += uint64(len)
+	// 	a.LengthSPSExtNALU = make([]LengthParameterSetNALU, a.NumOfSequenceParameterSetExt)
+	// 	for i := 0; i < int(a.NumOfSequenceParameterSetExt); i++ {
+	// 		var len uint16
+	// 		if err := util.ReadOrError(r, data[:2]); err != nil {
+	// 			return parsedBytes, err
+	// 		} else {
+	// 			len = binary.BigEndian.Uint16(data[:2])
+	// 			a.LengthSPSExtNALU[i].Length = len
+	// 			parsedBytes += 2
+	// 		}
+
+	// 		if bytes, err := a.LengthSPSExtNALU[i].NALUnit.Parse(r, int(len)); err != nil {
+	// 			return parsedBytes, err
+	// 		} else {
+	// 			parsedBytes += uint64(bytes)
+	// 		}
 	// 	}
 	// }
 
