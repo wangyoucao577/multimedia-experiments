@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/golang/glog"
-	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/bitreader"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util/expgolombcoding"
 )
 
@@ -52,50 +52,45 @@ type SequenceParameterSetData struct {
 	FrameCropTopOffset              *expgolombcoding.Unsigned  `json:"frame_crop_top_offset,omitempty"`                 // Exp-Golomb-coded
 	FrameCropBottomOffset           *expgolombcoding.Unsigned  `json:"frame_crop_bottom_offset,omitempty"`              // Exp-Golomb-coded
 	VuiParametersPresentFlag        uint8                      `json:"vui_parameters_present_flag"`                     // 1 bit
-	//TODO: vui_parameters()
+	VUIParameters                   *VUIParameters             `json:"vui_parameters,omitempty"`
 }
 
 // Parse parses bytes to AVC SPS NAL Unit, return parsed bytes or error.
 func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) {
-	var parsedBytes uint64
+	var parsedBits uint64
+	br := bitreader.New(r) // start bit-level parsing here
 
-	nextByte := make([]byte, 1)
-
-	if err := util.ReadOrError(r, nextByte); err != nil {
-		return parsedBytes, err
+	if nextByte, err := br.ReadByte(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		s.ProfileIdc = nextByte[0]
-		parsedBytes += 1
+		s.ProfileIdc = nextByte
+		parsedBits += bitsPerByte
 	}
 
-	if err := util.ReadOrError(r, nextByte); err != nil {
-		return parsedBytes, err
+	if nextByte, err := br.ReadByte(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		s.ConstraintSet0Flag = (nextByte[0] >> 7) & 0x1
-		s.ConstraintSet1Flag = (nextByte[0] >> 6) & 0x1
-		s.ConstraintSet2Flag = (nextByte[0] >> 5) & 0x1
-		s.ConstraintSet3Flag = (nextByte[0] >> 4) & 0x1
-		s.ConstraintSet4Flag = (nextByte[0] >> 3) & 0x1
-		s.ConstraintSet5Flag = (nextByte[0] >> 2) & 0x1
-
-		parsedBytes += 1
+		s.ConstraintSet0Flag = (nextByte >> 7) & 0x1
+		s.ConstraintSet1Flag = (nextByte >> 6) & 0x1
+		s.ConstraintSet2Flag = (nextByte >> 5) & 0x1
+		s.ConstraintSet3Flag = (nextByte >> 4) & 0x1
+		s.ConstraintSet4Flag = (nextByte >> 3) & 0x1
+		s.ConstraintSet5Flag = (nextByte >> 2) & 0x1
+		parsedBits += bitsPerByte
 	}
 
-	if err := util.ReadOrError(r, nextByte); err != nil {
-		return parsedBytes, err
+	if nextByte, err := br.ReadByte(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		s.LevelIdc = nextByte[0]
-		parsedBytes += 1
+		s.LevelIdc = nextByte
+		parsedBits += bitsPerByte
 	}
 
-	var nextCostBits uint64
-
-	if costBits, err := s.SeqParameterSetID.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.SeqParameterSetID.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits := s.SeqParameterSetID.RemainBits()
 
 	// ISO/IEC-14496-10 7.3.2.1.1
 	if s.ProfileIdc == 100 || s.ProfileIdc == 110 || s.ProfileIdc == 122 ||
@@ -103,86 +98,51 @@ func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) 
 		s.ProfileIdc == 86 || s.ProfileIdc == 118 || s.ProfileIdc == 128 {
 
 		expUnsigned := &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.ChromaFormatIdc = expUnsigned
 
 		if s.ChromaFormatIdc.Value() == 3 {
-			if numOfRemainBits > 0 {
-				v := (remainBits >> (numOfRemainBits - 1)) & 0x1
-				s.SeparateColourPlaneFlag = &v
-				numOfRemainBits--
+			if nextBit, err := br.ReadBit(); err != nil {
+				return parsedBits / bitsPerByte, err
 			} else {
-				if err := util.ReadOrError(r, nextByte); err != nil {
-					return parsedBytes, err
-				} else {
-					v := (nextByte[0] >> 7) & 0x1
-					s.SeparateColourPlaneFlag = &v
-					remainBits = nextByte[0]
-					numOfRemainBits = 7 // 8-1
-				}
+				s.SeparateColourPlaneFlag = &nextBit
+				parsedBits++
 			}
-			nextCostBits += 1
 		}
 
 		expUnsigned = &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
-			glog.Warningf("BitDepthLumaMinus8 cost bits %d", 1)
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.BitDepthLumaMinus8 = expUnsigned
 
 		expUnsigned = &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
-			glog.Warningf("BitDepthChromaMinus8 cost bits %d", 1)
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.BitDepthChromaMinus8 = expUnsigned
 
-		if numOfRemainBits > 0 {
-			v := (remainBits >> (numOfRemainBits - 1)) & 0x1
-			s.QpprimeYZeroTransformBypassFlag = &v
-			numOfRemainBits--
+		if nextBit, err := br.ReadBit(); err != nil {
+			return parsedBits, err
 		} else {
-			if err := util.ReadOrError(r, nextByte); err != nil {
-				return parsedBytes, err
-			} else {
-				v := (nextByte[0] >> 7) & 0x1
-				s.QpprimeYZeroTransformBypassFlag = &v
-				remainBits = nextByte[0]
-				numOfRemainBits = 7 // 8-1
-			}
+			s.QpprimeYZeroTransformBypassFlag = &nextBit
+			parsedBits++
 		}
-		nextCostBits += 1
 
-		if numOfRemainBits > 0 {
-			v := (remainBits >> (numOfRemainBits - 1)) & 0x1
-			s.SeqScalingMatrixPresentFlag = &v
-			numOfRemainBits--
+		if nextBit, err := br.ReadBit(); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			if err := util.ReadOrError(r, nextByte); err != nil {
-				return parsedBytes, err
-			} else {
-				v := (nextByte[0] >> 7) & 0x1
-				s.SeqScalingMatrixPresentFlag = &v
-				remainBits = nextByte[0]
-				numOfRemainBits = 7 // 8-1
-			}
+			s.SeqScalingMatrixPresentFlag = &nextBit
+			parsedBits++
 		}
-		nextCostBits += 1
 
 		if s.SeqScalingMatrixPresentFlag != nil && *s.SeqScalingMatrixPresentFlag != 0 {
 
@@ -192,43 +152,30 @@ func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) 
 			}
 
 			for i := 0; i < scalingListPresentFlagLen; i++ {
-				if numOfRemainBits > 0 {
-					presentFlag := (remainBits >> (numOfRemainBits - 1)) & 0x1
-					s.SeqScalingListPresentFlag = append(s.SeqScalingListPresentFlag, presentFlag)
-					numOfRemainBits--
+				if nextBit, err := br.ReadBit(); err != nil {
+					return parsedBits / bitsPerByte, err
 				} else {
-					if err := util.ReadOrError(r, nextByte); err != nil {
-						return parsedBytes, err
-					} else {
-						presentFlag := (nextByte[0] >> 7) & 0x1
-						s.SeqScalingListPresentFlag = append(s.SeqScalingListPresentFlag, presentFlag)
-						remainBits = nextByte[0]
-						numOfRemainBits = 7 // 8-1
-					}
+					s.SeqScalingListPresentFlag = append(s.SeqScalingListPresentFlag, nextBit)
+					parsedBits++
 				}
-				nextCostBits += 1
 
 				if s.SeqScalingListPresentFlag[i] != 0 {
 					if i < 6 {
 						sp := scalingListParser{sizeOfScalingList: 16}
-						sp.setRemainBits(remainBits, numOfRemainBits)
-						if costBits, err := sp.parse(r); err != nil {
-							return parsedBytes, err
+						if costBits, err := sp.parse(br); err != nil {
+							return parsedBits / bitsPerByte, err
 						} else {
-							nextCostBits += costBits
+							parsedBits += costBits
 						}
-						remainBits, numOfRemainBits = sp.remainBits()
 						s.ScalingList4x4 = append(s.ScalingList4x4, sp.scalingList)
 						s.DeltaScale = append(s.DeltaScale, sp.deltaScale)
 					} else {
 						sp := scalingListParser{sizeOfScalingList: 64}
-						sp.setRemainBits(remainBits, numOfRemainBits)
-						if costBits, err := sp.parse(r); err != nil {
-							return parsedBytes, err
+						if costBits, err := sp.parse(br); err != nil {
+							return parsedBits / bitsPerByte, err
 						} else {
-							nextCostBits += costBits
+							parsedBits += costBits
 						}
-						remainBits, numOfRemainBits = sp.remainBits()
 						s.ScalingList8x8 = append(s.ScalingList8x8, sp.scalingList)
 						s.DeltaScale = append(s.DeltaScale, sp.deltaScale)
 					}
@@ -238,264 +185,186 @@ func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) 
 		}
 	}
 
-	s.Log2MaxFrameNumMinus4.SetRemainBits(remainBits, numOfRemainBits)
-	if costBits, err := s.Log2MaxFrameNumMinus4.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.Log2MaxFrameNumMinus4.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits = s.Log2MaxFrameNumMinus4.RemainBits()
 
-	s.PicOrderCntType.SetRemainBits(remainBits, numOfRemainBits)
-	if costBits, err := s.PicOrderCntType.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.PicOrderCntType.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits = s.PicOrderCntType.RemainBits()
 
 	if s.PicOrderCntType.Value() == 0 {
 		expUnsigned := &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.Log2MaxPicOrderCntLsbMinus4 = expUnsigned
 	} else if s.PicOrderCntType.Value() == 1 {
-		if numOfRemainBits > 0 {
-			v := (remainBits >> (numOfRemainBits - 1)) & 0x1
-			s.DeltaPicOrderAlwaysZeroFlag = &v
-			numOfRemainBits--
+		if nextBit, err := br.ReadBit(); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			if err := util.ReadOrError(r, nextByte); err != nil {
-				return parsedBytes, err
-			} else {
-				v := (nextByte[0] >> 7) & 0x1
-				s.DeltaPicOrderAlwaysZeroFlag = &v
-				remainBits = nextByte[0]
-				numOfRemainBits = 7 // 8-1
-			}
+			s.DeltaPicOrderAlwaysZeroFlag = &nextBit
+			parsedBits++
 		}
-		nextCostBits += 1
 
 		expSigned := &expgolombcoding.Signed{}
-		expSigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expSigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expSigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expSigned.RemainBits()
 		s.OffsetForNonRefPic = expSigned
 
 		expSigned = &expgolombcoding.Signed{}
-		expSigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expSigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expSigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expSigned.RemainBits()
 		s.OffsetForTopToBottomField = expSigned
 
 		expUnsigned := &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expSigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.NumRefFramesInPicOrderCntCycle = expUnsigned
 
 		for i := 0; i < int(s.NumRefFramesInPicOrderCntCycle.Value()); i++ {
 			expSigned := expgolombcoding.Signed{}
-			expSigned.SetRemainBits(remainBits, numOfRemainBits)
-			if costBits, err := expSigned.Parse(r); err != nil {
-				return parsedBytes, err
+			if costBits, err := expSigned.Parse(br); err != nil {
+				return parsedBits / bitsPerByte, err
 			} else {
 				s.OffsetForRefFrame = append(s.OffsetForRefFrame, expSigned)
-				nextCostBits += costBits
+				parsedBits += costBits
 			}
-			remainBits, numOfRemainBits = expSigned.RemainBits()
 		}
 	}
 
-	s.MaxNumRefFrames.SetRemainBits(remainBits, numOfRemainBits)
-	if costBits, err := s.MaxNumRefFrames.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.MaxNumRefFrames.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits = s.MaxNumRefFrames.RemainBits()
 
-	if numOfRemainBits > 0 {
-		s.GapsInFrameNumValueAllowedFlag = (remainBits >> (numOfRemainBits - 1)) & 0x1
-		numOfRemainBits--
+	if nextBit, err := br.ReadBit(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		if err := util.ReadOrError(r, nextByte); err != nil {
-			return parsedBytes, err
-		} else {
-			s.GapsInFrameNumValueAllowedFlag = (nextByte[0] >> 7) & 0x1
-			remainBits = nextByte[0]
-			numOfRemainBits = 7 // 8-1
-		}
+		s.GapsInFrameNumValueAllowedFlag = nextBit
+		parsedBits++
 	}
-	nextCostBits += 1
 
-	s.PicWidthInMbsMinus1.SetRemainBits(remainBits, numOfRemainBits)
-	if costBits, err := s.PicWidthInMbsMinus1.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.PicWidthInMbsMinus1.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits = s.PicWidthInMbsMinus1.RemainBits()
 
-	s.PicHeightInMapUnitsMinus1.SetRemainBits(remainBits, numOfRemainBits)
-	if costBits, err := s.PicHeightInMapUnitsMinus1.Parse(r); err != nil {
-		return parsedBytes, err
+	if costBits, err := s.PicHeightInMapUnitsMinus1.Parse(br); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		nextCostBits += costBits
+		parsedBits += costBits
 	}
-	remainBits, numOfRemainBits = s.PicHeightInMapUnitsMinus1.RemainBits()
 
-	if numOfRemainBits > 0 {
-		s.FrameMbsOnlyFlag = (remainBits >> (numOfRemainBits - 1)) & 0x1
-		numOfRemainBits--
+	if nextBit, err := br.ReadBit(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		if err := util.ReadOrError(r, nextByte); err != nil {
-			return parsedBytes, err
-		} else {
-			s.FrameMbsOnlyFlag = (nextByte[0] >> 7) & 0x1
-			remainBits = nextByte[0]
-			numOfRemainBits = 7 // 8-1
-		}
+		s.FrameMbsOnlyFlag = nextBit
+		parsedBits++
 	}
-	nextCostBits += 1
 
 	if s.FrameMbsOnlyFlag == 0 {
-		if numOfRemainBits > 0 {
-			v := (remainBits >> (numOfRemainBits - 1)) & 0x1
-			s.MbAdaptiveFrameFieldFlag = &v
-			numOfRemainBits--
+		if nextBit, err := br.ReadBit(); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			if err := util.ReadOrError(r, nextByte); err != nil {
-				return parsedBytes, err
-			} else {
-				v := (nextByte[0] >> 7) & 0x1
-				s.MbAdaptiveFrameFieldFlag = &v
-				remainBits = nextByte[0]
-				numOfRemainBits = 7 // 8-1
-			}
+			s.MbAdaptiveFrameFieldFlag = &nextBit
+			parsedBits++
 		}
-		nextCostBits += 1
 	}
 
-	if numOfRemainBits > 0 {
-		s.Direct8x8InferenceFlag = (remainBits >> (numOfRemainBits - 1)) & 0x1
-		numOfRemainBits--
+	if nextBit, err := br.ReadBit(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		if err := util.ReadOrError(r, nextByte); err != nil {
-			return parsedBytes, err
-		} else {
-			s.Direct8x8InferenceFlag = (nextByte[0] >> 7) & 0x1
-			remainBits = nextByte[0]
-			numOfRemainBits = 7 // 8-1
-		}
+		s.Direct8x8InferenceFlag = nextBit
+		parsedBits++
 	}
-	nextCostBits += 1
 
-	if numOfRemainBits > 0 {
-		s.FrameCroppingFlag = (remainBits >> (numOfRemainBits - 1)) & 0x1
-		numOfRemainBits--
+	if nextBit, err := br.ReadBit(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		if err := util.ReadOrError(r, nextByte); err != nil {
-			return parsedBytes, err
-		} else {
-			s.FrameCroppingFlag = (nextByte[0] >> 7) & 0x1
-			remainBits = nextByte[0]
-			numOfRemainBits = 7 // 8-1
-		}
+		s.FrameCroppingFlag = nextBit
+		parsedBits++
 	}
-	nextCostBits += 1
 
 	if s.FrameCroppingFlag != 0 {
 		expUnsigned := &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.FrameCropLeftOffset = expUnsigned
 
 		expUnsigned = &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.FrameCropRightOffset = expUnsigned
 
 		expUnsigned = &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.FrameCropTopOffset = expUnsigned
 
 		expUnsigned = &expgolombcoding.Unsigned{}
-		expUnsigned.SetRemainBits(remainBits, numOfRemainBits)
-		if costBits, err := expUnsigned.Parse(r); err != nil {
-			return parsedBytes, err
+		if costBits, err := expUnsigned.Parse(br); err != nil {
+			return parsedBits / bitsPerByte, err
 		} else {
-			nextCostBits += costBits
+			parsedBits += costBits
 		}
-		remainBits, numOfRemainBits = expUnsigned.RemainBits()
 		s.FrameCropBottomOffset = expUnsigned
 	}
 
-	if numOfRemainBits > 0 {
-		s.VuiParametersPresentFlag = (remainBits >> (numOfRemainBits - 1)) & 0x1
-		numOfRemainBits--
+	if nextBit, err := br.ReadBit(); err != nil {
+		return parsedBits / bitsPerByte, err
 	} else {
-		if err := util.ReadOrError(r, nextByte); err != nil {
-			return parsedBytes, err
-		} else {
-			s.VuiParametersPresentFlag = (nextByte[0] >> 7) & 0x1
-			remainBits = nextByte[0]
-			numOfRemainBits = 7 // 8-1
-		}
+		s.VuiParametersPresentFlag = nextBit
+		parsedBits++
 	}
-	nextCostBits += 1
 
 	if s.VuiParametersPresentFlag != 0 {
-		//TODO:
-		glog.Warningf("vui_parameters need to parse")
-		parsedBytes += nextCostBits / 8
-		if nextCostBits%8 != 0 {
-			parsedBytes += 1
-		}
-		return parsedBytes, nil
+		// s.VUIParameters = &VUIParameters{}
+		// if costBits, err := s.VUIParameters.parse(r, remainBits, numOfRemainBits); err != nil {
+		// 	return parsedBytes, err
+		// } else {
+		// 	nextCostBits += costBits
+		// }
 	}
 
-	parsedBytes += nextCostBits / 8
-	if nextCostBits%8 != 0 {
-		glog.Warningf("bits doesn't align in 8 bits, remain %d bits", nextCostBits%8)
+	// bits to bytes
+	parsedBytes := parsedBits / bitsPerByte
+	if parsedBits%bitsPerByte != 0 {
+		glog.Warningf("bits start from seq_parameter_set_id doesn't align in 8 bits, total %d bits", parsedBits)
 		parsedBytes += 1
 	}
+	if br.CachedBitsCount() > 0 {
+		glog.Warningf("bitreader still has %d bits cached", br.CachedBitsCount())
+	}
+
 	if int(parsedBytes) != size {
 		glog.Warningf("parsed bytes != expect size : %d!=%d", parsedBytes, size)
 	}
-
 	return parsedBytes, nil
 }

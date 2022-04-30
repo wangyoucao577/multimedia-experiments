@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-// ReadOrError read a specifed amount of data, otherwise error.
+// ReadOrError reads a specifed amount of data, otherwise error.
 func ReadOrError(r io.Reader, data []byte) error {
 
 	l := len(data)
@@ -19,4 +19,13 @@ func ReadOrError(r io.Reader, data []byte) error {
 	}
 
 	return nil
+}
+
+// ReadByteOrError reads a byte in success, otherwise error.
+func ReadByteOrError(r io.Reader) (byte, error) {
+	nextByte := make([]byte, 1)
+	if err := ReadOrError(r, nextByte); err != nil {
+		return 0, err
+	}
+	return nextByte[0], nil
 }

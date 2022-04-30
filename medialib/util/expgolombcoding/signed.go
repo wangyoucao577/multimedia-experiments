@@ -2,7 +2,8 @@ package expgolombcoding
 
 import (
 	"encoding/json"
-	"io"
+
+	"github.com/wangyoucao577/multimedia-experiments/medialib/util/bitreader"
 )
 
 // Signed contains signed Exponential-Golomb coded integer.
@@ -21,21 +22,8 @@ func (s *Signed) Value() int64 {
 	return int64(s.unsigned.value)
 }
 
-// SetRemainBits sets bits for parsing.
-//   The bits should have (8-numOfBits) padding zero bits at the beginning of the byte, which should be ignored.
-//   For example, bits = [0, 0, 0, 0, 1, 0, 0, 0], numOfBit=5, then the first 3 `0` should be ignored.
-//   It should be called before `Parse` if need.
-func (s *Signed) SetRemainBits(prefixBits byte, numOfBits int) {
-	s.unsigned.SetRemainBits(prefixBits, numOfBits)
-}
-
-// RemainBits return remain bits and num of bits.
-func (s *Signed) RemainBits() (byte, int) {
-	return s.unsigned.RemainBits()
-}
-
 // Parse parses unsigned value of Exponential-Golomb Coding.
 // return the cost bits(NOT Byte) if succeed, otherwise error.
-func (s *Signed) Parse(r io.Reader) (uint64, error) {
+func (s *Signed) Parse(r *bitreader.Reader) (uint64, error) {
 	return s.unsigned.Parse(r)
 }
