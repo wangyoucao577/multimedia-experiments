@@ -1,6 +1,7 @@
 package box
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -23,7 +24,11 @@ func ParseBox(r io.Reader, pb ParentBox) (*Header, error) {
 	b, err := pb.CreateSubBox(boxHeader)
 	if err != nil {
 		//TODO: other types
-		glog.Warningf("ignore %v %s", err, boxHeader.Type)
+		glog.Warningf("ignore %v %s size %d", err, boxHeader.Type, boxHeader.PayloadSize())
+
+		if boxHeader.BoxSize() > (1 << 24) { // we set about 33MB to check invalid value
+			return &boxHeader, fmt.Errorf("box type %s invalid size %d", boxHeader.Type, boxHeader.BoxSize())
+		}
 
 		// read and ignore
 		//TODO: support seek
