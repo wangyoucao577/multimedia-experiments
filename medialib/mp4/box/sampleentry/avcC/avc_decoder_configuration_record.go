@@ -5,7 +5,14 @@ import (
 	"io"
 
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
 )
+
+// LengthParameterSetNALU represents Length,AVC SPS/PPS/SPSExt NALU, Length, ... composition.
+type LengthParameterSetNALU struct {
+	Length  uint16       `json:"length"`
+	NALUnit nalu.NALUnit `json:"nal_unit"`
+}
 
 // AVCDecoderConfigurationRecord defines AVC Decoder configuration record.
 type AVCDecoderConfigurationRecord struct {
@@ -19,14 +26,12 @@ type AVCDecoderConfigurationRecord struct {
 
 	// sps
 	// 3 bits reserved here
-	NumOfSequenceParameterSets  uint8    `json:"num_of_sequence_parameter_sets"` // 5 bits in file
-	SequenceParameterSetLength  []uint16 `json:"sequence_parameter_set_length"`
-	SequenceParameterSetNALUnit [][]byte `json:"sequence_parameter_set_nal_unit"`
+	NumOfSequenceParameterSets uint8                    `json:"num_of_sequence_parameter_sets"` // 5 bits in file
+	LengthSPSNALU              []LengthParameterSetNALU `json:"sequence_parameter_set,omitempty"`
 
 	// pps
-	NumOfPictureParameterSets  uint8    `json:"num_of_picture_parameter_sets"`
-	PictureParameterSetLength  []uint16 `json:"picture_parameter_set_length"`
-	PictureParameterSetNALUnit [][]byte `json:"picture_parameter_set_nal_unit"`
+	NumOfPictureParameterSets uint8                    `json:"num_of_picture_parameter_sets"`
+	LengthPPSNALU             []LengthParameterSetNALU `json:"picture_parameter_set,omitempty"`
 
 	// 6 bits reserved here
 	ChromaFormat uint8 `json:"chroma_format"` // 2 bits in file
@@ -36,9 +41,8 @@ type AVCDecoderConfigurationRecord struct {
 	BitDepthChromaMinus8 uint8 `json:"bit_depth_chroma_minus8"` // 3 bits in file
 
 	// sps extensions
-	NumOfSequenceParameterSetExt   uint8    `json:"num_of_sequence_parameter_set_ext"`
-	SequenceParameterSetExtLength  []uint16 `json:"sequence_parameter_set_ext_length"`
-	SequenceParameterSetExtNALUnit [][]byte `json:"sequence_parameter_set_ext_nal_unit"`
+	NumOfSequenceParameterSetExt uint8                    `json:"num_of_sequence_parameter_set_ext"`
+	LengthSPSExtNALU             []LengthParameterSetNALU `json:"sequence_parameter_set_ext,omitempty"`
 }
 
 // LengthSize returns NALU prefix length size.
@@ -71,22 +75,21 @@ func (a *AVCDecoderConfigurationRecord) parse(r io.Reader) (uint64, error) {
 		parsedBytes += 2
 	}
 
+	a.LengthSPSNALU = make([]LengthParameterSetNALU, a.NumOfSequenceParameterSets)
 	for i := 0; i < int(a.NumOfSequenceParameterSets); i++ {
 		var len uint16
 		if err := util.ReadOrError(r, data[:2]); err != nil {
 			return parsedBytes, err
 		} else {
 			len = binary.BigEndian.Uint16(data[:2])
-			a.SequenceParameterSetLength = append(a.SequenceParameterSetLength, len)
+			a.LengthSPSNALU[i].Length = len
 			parsedBytes += 2
 		}
 
-		nal := make([]byte, len)
-		if err := util.ReadOrError(r, nal); err != nil {
+		if bytes, err := a.LengthSPSNALU[i].NALUnit.Parse(r, int(len)); err != nil {
 			return parsedBytes, err
 		} else {
-			a.SequenceParameterSetNALUnit = append(a.SequenceParameterSetNALUnit, nal)
-			parsedBytes += uint64(len)
+			parsedBytes += uint64(bytes)
 		}
 	}
 
@@ -97,22 +100,21 @@ func (a *AVCDecoderConfigurationRecord) parse(r io.Reader) (uint64, error) {
 		parsedBytes += 1
 	}
 
+	a.LengthPPSNALU = make([]LengthParameterSetNALU, a.NumOfPictureParameterSets)
 	for i := 0; i < int(a.NumOfPictureParameterSets); i++ {
 		var len uint16
 		if err := util.ReadOrError(r, data[:2]); err != nil {
 			return parsedBytes, err
 		} else {
 			len = binary.BigEndian.Uint16(data[:2])
-			a.PictureParameterSetLength = append(a.PictureParameterSetLength, len)
+			a.LengthPPSNALU[i].Length = len
 			parsedBytes += 2
 		}
 
-		nal := make([]byte, len)
-		if err := util.ReadOrError(r, nal); err != nil {
+		if bytes, err := a.LengthPPSNALU[i].NALUnit.Parse(r, int(len)); err != nil {
 			return parsedBytes, err
 		} else {
-			a.PictureParameterSetNALUnit = append(a.PictureParameterSetNALUnit, nal)
-			parsedBytes += uint64(len)
+			parsedBytes += uint64(bytes)
 		}
 	}
 
