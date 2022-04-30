@@ -11,13 +11,14 @@ import (
 
 // SequenceParameterSetData represents SequenceParameterSetData defined in ISO/IEC-14496-10 7.3.2.
 type SequenceParameterSetData struct {
-	ProfileIdc         uint8 `json:"profile_idc"`
-	ConstraintSet0Flag uint8 `json:"constraint_set0_flag"` // 1 bit
-	ConstraintSet1Flag uint8 `json:"constraint_set1_flag"` // 1 bit
-	ConstraintSet2Flag uint8 `json:"constraint_set2_flag"` // 1 bit
-	ConstraintSet3Flag uint8 `json:"constraint_set3_flag"` // 1 bit
-	ConstraintSet4Flag uint8 `json:"constraint_set4_flag"` // 1 bit
-	ConstraintSet5Flag uint8 `json:"constraint_set5_flag"` // 1 bit
+	ProfileIdc         uint8  `json:"profile_idc"`
+	ProfileIdcName     string `json:"profile_idc_name"`     // NOT in byte stream, only store for better intuitive
+	ConstraintSet0Flag uint8  `json:"constraint_set0_flag"` // 1 bit
+	ConstraintSet1Flag uint8  `json:"constraint_set1_flag"` // 1 bit
+	ConstraintSet2Flag uint8  `json:"constraint_set2_flag"` // 1 bit
+	ConstraintSet3Flag uint8  `json:"constraint_set3_flag"` // 1 bit
+	ConstraintSet4Flag uint8  `json:"constraint_set4_flag"` // 1 bit
+	ConstraintSet5Flag uint8  `json:"constraint_set5_flag"` // 1 bit
 	// 2 bytes reserved here
 	LevelIdc                        uint8                      `json:"level_idc"`
 	SeqParameterSetID               expgolombcoding.Unsigned   `json:"seq_parameter_set_id"`                           // Exp-Golomb-coded
@@ -64,6 +65,7 @@ func (s *SequenceParameterSetData) Parse(r io.Reader, size int) (uint64, error) 
 		return parsedBits / bitsPerByte, err
 	} else {
 		s.ProfileIdc = nextByte
+		s.ProfileIdcName = ProfileName(s.ProfileIdc)
 		parsedBits += bitsPerByte
 	}
 

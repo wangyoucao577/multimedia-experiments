@@ -6,6 +6,7 @@ import (
 
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
 
 // LengthParameterSetNALU represents Length,AVC SPS/PPS/SPSExt NALU, Length, ... composition.
@@ -16,10 +17,11 @@ type LengthParameterSetNALU struct {
 
 // AVCDecoderConfigurationRecord defines AVC Decoder configuration record.
 type AVCDecoderConfigurationRecord struct {
-	ConfigurationVersion uint8 `json:"configuration_version"`
-	AVCProfileIndication uint8 `json:"avc_profile_indication"`
-	ProfileCompatibility uint8 `json:"profile_compatibility"`
-	AVCLevelIndication   uint8 `json:"avc_level_indication"`
+	ConfigurationVersion     uint8  `json:"configuration_version"`
+	AVCProfileIndication     uint8  `json:"avc_profile_indication"`
+	AVCProfileIndicationName string `json:"avc_profile_indication_name"` // NOT in byte stream, only store for better intuitive
+	ProfileCompatibility     uint8  `json:"profile_compatibility"`
+	AVCLevelIndication       uint8  `json:"avc_level_indication"`
 
 	// 6 bits reserved here
 	LengthSizeMinusOne uint8 `json:"length_size_minus_one"` // 2 bits in file
@@ -61,6 +63,7 @@ func (a *AVCDecoderConfigurationRecord) parse(r io.Reader) (uint64, error) {
 	} else {
 		a.ConfigurationVersion = data[0]
 		a.AVCProfileIndication = data[1]
+		a.AVCProfileIndicationName = sps.ProfileName(a.AVCProfileIndication)
 		a.ProfileCompatibility = data[2]
 		a.AVCLevelIndication = data[3]
 
