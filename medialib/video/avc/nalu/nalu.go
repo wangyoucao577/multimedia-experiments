@@ -24,7 +24,7 @@ type NALUnit struct {
 
 	nalUnitHeaderSvcExtension []byte `json:"-"` // TODO: parse nal_unit_header_svc_extension
 
-	RBRP []byte `json:"-"` // Raw byte sequence payloads
+	RBSP []byte `json:"-"` // Raw byte sequence payloads
 
 	// parsed RBRP if available
 	SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
@@ -45,7 +45,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		nalUnitHeaderSvcExtension []byte `json:"-"` // TODO: parse nal_unit_header_svc_extension
 
 		// raw bytes and raw bytes sequence payloads
-		RBRP []byte `json:"rbrb,omitempty"` // Raw byte sequence payloads
+		RBSP []byte `json:"rbsp,omitempty"` // Raw byte sequence payloads
 
 		// parsed RBRP data
 		SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
@@ -61,7 +61,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 
 		nalUnitHeaderSvcExtension: n.nalUnitHeaderSvcExtension,
 
-		// RBRP: b.RBRP, // set by type
+		// RBSP: b.RBSP, // set by type
 
 		SEIMessage:               n.SEIMessage,
 		AccessUnitDelimiter:      n.AccessUnitDelimiter,
@@ -75,7 +75,7 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		fallthrough
 	case TypeSPS:
 		nj.RawBytes = n.RawBytes
-		nj.RBRP = n.RBRP
+		nj.RBSP = n.RBSP
 	}
 
 	return json.Marshal(nj)
@@ -120,19 +120,19 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 		}
 	}
 
-	n.RBRP = make([]byte, size-nalUnitHeaderBytes)
-	if err := util.ReadOrError(r, n.RBRP); err != nil {
+	n.RBSP = make([]byte, size-nalUnitHeaderBytes)
+	if err := util.ReadOrError(r, n.RBSP); err != nil {
 		return parsedBytes, err
 	} else {
-		n.RawBytes = append(n.RawBytes, n.RBRP...)
+		n.RawBytes = append(n.RawBytes, n.RBSP...)
 		parsedBytes += uint64(size - nalUnitHeaderBytes)
 	}
-	n.RBRP = getRBRP(n.RBRP)
+	n.RBSP = getRBSP(n.RBSP)
 
-	// Parse RBRP
+	// Parse RBSP
 	parser := n.prepareRBRPParser()
 	if parser != nil {
-		if _, err := parser.Parse(bytes.NewReader(n.RBRP), len(n.RBRP)); err != nil {
+		if _, err := parser.Parse(bytes.NewReader(n.RBSP), len(n.RBSP)); err != nil {
 			return parsedBytes, fmt.Errorf("parse nalu type %d rbrp failed", n.NALUnitType)
 		}
 	} else {
@@ -164,22 +164,22 @@ func (n *NALUnit) Raw() []byte {
 	return n.RawBytes
 }
 
-// raw RBRP -> RBRP, remove emulation_prevention_three_byte 0x03
-func getRBRP(rbrpBytes []byte) []byte {
-	numBytesOfRBRP := len(rbrpBytes)
+// raw RBSP -> RBSP, remove emulation_prevention_three_byte 0x03
+func getRBSP(rbspBytes []byte) []byte {
+	numBytesOfRBSP := len(rbspBytes)
 
-	rbrp := []byte{}
-	for i := 0; i < numBytesOfRBRP; i++ {
-		if i+2 < numBytesOfRBRP &&
-			rbrpBytes[i] == 0x00 &&
-			rbrpBytes[i+1] == 0x00 &&
-			rbrpBytes[i+2] == 0x03 {
-			rbrp = append(rbrp, rbrpBytes[i], rbrpBytes[i+1])
+	rbsp := []byte{}
+	for i := 0; i < numBytesOfRBSP; i++ {
+		if i+2 < numBytesOfRBSP &&
+			rbspBytes[i] == 0x00 &&
+			rbspBytes[i+1] == 0x00 &&
+			rbspBytes[i+2] == 0x03 {
+			rbsp = append(rbsp, rbspBytes[i], rbspBytes[i+1])
 			i += 2
 			// ignore emulation_prevention_three_byte, equal to 0x03
 		} else {
-			rbrp = append(rbrp, rbrpBytes[i])
+			rbsp = append(rbsp, rbspBytes[i])
 		}
 	}
-	return rbrp
+	return rbsp
 }
