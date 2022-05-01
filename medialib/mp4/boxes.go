@@ -140,7 +140,7 @@ func (b *Boxes) ParsePayload(r io.Reader) error {
 // Use trackID to select the specified one, trackID <= 0 means use the first found one.
 func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
 
-	if b.Moov == nil || b.MoofMdat == nil {
+	if b.Moov == nil || (b.MoofMdat == nil && b.Mdat == nil) {
 		return nil, fmt.Errorf("moov, moof or mdat not found")
 	}
 
@@ -164,6 +164,7 @@ func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
 		return nil, fmt.Errorf("trackID %d not found", trackID)
 	}
 
+	// fragment-mp4 if exist
 	for i := 0; i < len(b.MoofMdat); i++ {
 		for _, tf := range b.MoofMdat[i].Moof.Traf {
 			if int(tf.Tfhd.TrackID) != trackID {
@@ -174,12 +175,19 @@ func (b *Boxes) ExtractES(trackID int) (*es.ElementaryStream, error) {
 				var startPos uint32
 				for _, sampleSize := range tr.SampleSize {
 					data := b.MoofMdat[i].Mdat.Data[startPos : startPos+sampleSize]
-					e.Parse(bytes.NewReader(data), len(data))
+					if _, err := e.Parse(bytes.NewReader(data), len(data)); err != nil {
+						return &e, err
+					}
 					startPos += sampleSize
 				}
 			}
 			break
 		}
+	}
+
+	// mp4 if exist
+	for i := 0; i < len(b.Mdat); i++ {
+
 	}
 
 	return &e, nil
