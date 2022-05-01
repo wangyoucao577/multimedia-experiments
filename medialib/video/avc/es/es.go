@@ -12,6 +12,8 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/pps"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
 
 // LengthNALU represents a length and nalu composition.
@@ -25,6 +27,10 @@ type ElementaryStream struct {
 	LengthNALU []LengthNALU `json:"length_nalu"`
 
 	LengthSize uint32 `json:"length_size"`
+
+	// cache for slice parsing
+	sps *sps.SequenceParameterSetData `json:"-"`
+	pps *pps.PictureParameterSet      `json:"-"`
 }
 
 // SetLengthSize sets length size before every nalu.
@@ -42,7 +48,9 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 
 	var parsedBytes uint64
 	for parsedBytes < uint64(size) {
-		ln := LengthNALU{}
+		ln := LengthNALU{
+			NALU: nalu.NALUnit{SequenceParameterSetData: e.sps, PictureParameterSet: e.pps},
+		}
 
 		// parse nalu length
 		data := make([]byte, 4)
@@ -65,6 +73,12 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 			return parsedBytes, err
 		} else {
 			parsedBytes += bytes
+		}
+		if ln.NALU.NALUnitType == nalu.TypeSPS {
+			e.sps = ln.NALU.SequenceParameterSetData
+		}
+		if ln.NALU.NALUnitType == nalu.TypePPS {
+			e.pps = ln.NALU.PictureParameterSet
 		}
 
 		e.LengthNALU = append(e.LengthNALU, ln)
