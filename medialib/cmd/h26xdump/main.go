@@ -37,7 +37,7 @@ func main() {
 		h := annexbes.NewHandler(flags.inputFilePath)
 		if err := h.Parse(); err != nil {
 			if err != io.EOF {
-				glog.Errorf("Parse mp4 failed, err %v", err)
+				glog.Errorf("Parse ES failed, err %v", err)
 				exit.Fail()
 			}
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/aud"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/pps"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sei"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/slice"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
 
@@ -28,10 +29,12 @@ type NALUnit struct {
 	RBSP []byte `json:"-"` // Raw byte sequence payloads
 
 	// parsed RBRP if available
-	SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
-	AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
-	SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
-	PictureParameterSet      *pps.PictureParameterSet      `json:"picture_parameter_set,omitempty"`
+	SEIMessage               *sei.SEIMessage                      `json:"sei_message,omitempty"`
+	AccessUnitDelimiter      *aud.AccessUnitDelimiter             `json:"access_unit_delimiter,omitempty"`
+	SequenceParameterSetData *sps.SequenceParameterSetData        `json:"seq_parameter_set_data,omitempty"`
+	PictureParameterSet      *pps.PictureParameterSet             `json:"picture_parameter_set,omitempty"`
+	IDR                      []slice.LayerWithoutPartitioningRbsp `json:"idr,omitempty"`
+	NonIDR                   []slice.LayerWithoutPartitioningRbsp `json:"non-idr,omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -50,10 +53,12 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		RBSP []byte `json:"rbsp,omitempty"` // Raw byte sequence payloads
 
 		// parsed RBRP data
-		SEIMessage               *sei.SEIMessage               `json:"sei_message,omitempty"`
-		AccessUnitDelimiter      *aud.AccessUnitDelimiter      `json:"access_unit_delimiter,omitempty"`
-		SequenceParameterSetData *sps.SequenceParameterSetData `json:"seq_parameter_set_data,omitempty"`
-		PictureParameterSet      *pps.PictureParameterSet      `json:"picture_parameter_set,omitempty"`
+		SEIMessage               *sei.SEIMessage                      `json:"sei_message,omitempty"`
+		AccessUnitDelimiter      *aud.AccessUnitDelimiter             `json:"access_unit_delimiter,omitempty"`
+		SequenceParameterSetData *sps.SequenceParameterSetData        `json:"seq_parameter_set_data,omitempty"`
+		PictureParameterSet      *pps.PictureParameterSet             `json:"picture_parameter_set,omitempty"`
+		IDR                      []slice.LayerWithoutPartitioningRbsp `json:"idr,omitempty"`
+		NonIDR                   []slice.LayerWithoutPartitioningRbsp `json:"non-idr,omitempty"`
 	}{
 		// RawBytes:               n.RawBytes, // set by type
 
@@ -70,6 +75,8 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 		AccessUnitDelimiter:      n.AccessUnitDelimiter,
 		SequenceParameterSetData: n.SequenceParameterSetData,
 		PictureParameterSet:      n.PictureParameterSet,
+		IDR:                      n.IDR,
+		NonIDR:                   n.NonIDR,
 	}
 
 	switch n.NALUnitType {
@@ -82,6 +89,15 @@ func (n *NALUnit) MarshalJSON() ([]byte, error) {
 	case TypePPS:
 		nj.RawBytes = n.RawBytes
 		nj.RBSP = n.RBSP
+	}
+
+	switch n.NALUnitType {
+	case TypeSPS:
+	case TypePPS: // clear sps data if PPS type, since they're set for data parsing
+		nj.SequenceParameterSetData = nil
+	default: // clear sps and pps data if NOT SPS/PPS type, since they're set for data parsing
+		nj.SequenceParameterSetData = nil
+		nj.PictureParameterSet = nil
 	}
 
 	return json.Marshal(nj)
@@ -139,7 +155,11 @@ func (n *NALUnit) Parse(r io.Reader, size int) (uint64, error) {
 	parser := n.prepareRBRPParser()
 	if parser != nil {
 		if _, err := parser.Parse(bytes.NewReader(n.RBSP), len(n.RBSP)); err != nil {
-			return parsedBytes, fmt.Errorf("parse nalu type %d rbrp failed", n.NALUnitType)
+			if err != slice.ErrEmptyParameterSet {
+				return parsedBytes, fmt.Errorf("parse nalu type %d rbrp failed, err %v", n.NALUnitType, err)
+			} else {
+				glog.Warningf("parse nalu type %d rbrp failed, ignore it, err %v", n.NALUnitType, err)
+			}
 		}
 	} else {
 		glog.Warningf("unknown nalu type %d, ignored", n.NALUnitType)
@@ -163,6 +183,16 @@ func (n *NALUnit) prepareRBRPParser() NALUParser {
 		n.PictureParameterSet = &pps.PictureParameterSet{}
 		n.PictureParameterSet.SetSPS(n.SequenceParameterSetData)
 		return n.PictureParameterSet
+	case TypeIDR:
+		n.IDR = append(n.IDR, slice.LayerWithoutPartitioningRbsp{})
+		newSlice := &n.IDR[len(n.IDR)-1]
+		newSlice.SetParameterSet(n.SequenceParameterSetData, n.PictureParameterSet)
+		return newSlice
+	case TypeNonIDR:
+		n.NonIDR = append(n.NonIDR, slice.LayerWithoutPartitioningRbsp{})
+		newSlice := &n.NonIDR[len(n.NonIDR)-1]
+		newSlice.SetParameterSet(n.SequenceParameterSetData, n.PictureParameterSet)
+		return newSlice
 
 		// TODO: others
 	}

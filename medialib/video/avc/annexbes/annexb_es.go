@@ -12,6 +12,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/util"
 	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/pps"
+	"github.com/wangyoucao577/multimedia-experiments/medialib/video/avc/nalu/sps"
 )
 
 var (
@@ -32,6 +34,8 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 	var parsedBytes uint64
 	startCodeData := []byte{}
 	naluData := []byte{}
+	var sps *sps.SequenceParameterSetData
+	var pps *pps.PictureParameterSet
 
 	for {
 		if size > 0 && parsedBytes >= uint64(size) { // valid size
@@ -72,9 +76,15 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 
 		// parse NALU here
 		if len(naluData) > 0 {
-			n := nalu.NALUnit{}
+			n := nalu.NALUnit{SequenceParameterSetData: sps, PictureParameterSet: pps}
 			if _, err := n.Parse(bytes.NewReader(naluData), len(naluData)); err != nil {
 				return parsedBytes, err
+			}
+			if n.NALUnitType == nalu.TypeSPS {
+				sps = n.SequenceParameterSetData
+			}
+			if n.NALUnitType == nalu.TypePPS {
+				pps = n.PictureParameterSet
 			}
 			e.NALU = append(e.NALU, n)
 		}
@@ -90,7 +100,7 @@ func (e *ElementaryStream) Parse(r io.Reader, size int) (uint64, error) {
 
 	// parse last NALU
 	if len(naluData) > 0 {
-		n := nalu.NALUnit{}
+		n := nalu.NALUnit{SequenceParameterSetData: sps, PictureParameterSet: pps}
 		if _, err := n.Parse(bytes.NewReader(naluData), len(naluData)); err != nil {
 			return parsedBytes, err
 		}
