@@ -1,6 +1,59 @@
 
 #include "decoding.h"
 
+enum AVPixelFormat Decoding::get_hw_format(AVCodecContext *ctx,
+                                           const enum AVPixelFormat *pix_fmts) {
+
+  if (!config_ctx_ ||
+      config_ctx_->hwaccel_device_type != AV_HWDEVICE_TYPE_CUDA) {
+    av_log(NULL, AV_LOG_ERROR, "invalid hw device type %d.\n",
+           config_ctx_ ? config_ctx_->hwaccel_device_type
+                       : AV_HWDEVICE_TYPE_NONE);
+    return AV_PIX_FMT_NONE;
+  }
+
+  const enum AVPixelFormat *p;
+
+  for (p = pix_fmts; *p != -1; p++) {
+    if (*p == hw_pix_fmt_)
+      return *p;
+  }
+
+  av_log(NULL, AV_LOG_ERROR, "Failed to get HW surface format.\n");
+  return AV_PIX_FMT_NONE;
+}
+
+int Decoding::hw_decoder_init(const AVCodec *dec, AVCodecContext *ctx,
+                              const enum AVHWDeviceType type) {
+  int err = 0;
+
+  for (int i = 0;; i++) { // find hw config
+    const AVCodecHWConfig *config = avcodec_get_hw_config(dec, i);
+    if (!config) {
+      av_log(NULL, AV_LOG_ERROR,
+             "Decoder %s does not support device type %s.\n", dec->name,
+             av_hwdevice_get_type_name(config_ctx_->hwaccel_device_type));
+      return AVERROR_DECODER_NOT_FOUND;
+    }
+    if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+        config->device_type == config_ctx_->hwaccel_device_type) {
+      hw_pix_fmt_ = config->pix_fmt;
+      break;
+    }
+  }
+
+  if ((err = av_hwdevice_ctx_create(&hw_device_ctx_, type, NULL, NULL, 0)) <
+      0) {
+    fprintf(stderr, "Failed to create specified HW device.\n");
+    return err;
+  }
+  ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
+  // ctx->extra_hw_frames = 21; // try to fix the `No decoder surface left`
+  // error
+
+  return err;
+}
+
 Decoding::~Decoding() {
   release(); // double check to make sure resources can be released properly
 }
@@ -22,6 +75,12 @@ void Decoding::release() {
   }
   nb_streams_ = 0;
 
+  if (hw_device_ctx_) {
+    av_buffer_unref(&hw_device_ctx_);
+  }
+  if (hw_frames_ctx_) {
+    av_buffer_unref(&hw_frames_ctx_);
+  }
   if (ifmt_ctx_) {
     avformat_close_input(&ifmt_ctx_);
   }
@@ -112,6 +171,17 @@ int Decoding::Open() {
     if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
       dec_ctx_[i].codec_ctx->framerate =
           av_guess_frame_rate(ifmt_ctx_, stream, NULL);
+    }
+
+    if (config_ctx_ && config_ctx_->hwaccel_device_type ==
+                           AV_HWDEVICE_TYPE_CUDA) { // hwaccel cuda
+
+      ret = hw_decoder_init(dec, dec_ctx_[i].codec_ctx,
+                            config_ctx_->hwaccel_device_type);
+      if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "hw_decoder_init failed, ret %d\n", ret);
+        return ret;
+      }
     }
 
     AVDictionary *opts = NULL;
@@ -288,6 +358,68 @@ int Decoding::receive_frames(int stream_index) {
 
     if (ret == AVERROR_OK) {
       dec_ctx.out_count++;
+
+      if (config_ctx_ && config_ctx_->hwaccel_device_type ==
+                             AV_HWDEVICE_TYPE_CUDA) { // hwaccel cuda
+
+        if (dec_ctx.frame != nullptr &&
+            config_ctx_->hwaccel_output_format_cuda &&
+            config_ctx_->enable_cuda_frames_caching) {
+          // caches frames in cuda memory, not in decoder's internal memory
+
+          if (!hw_frames_ctx_) { // get frames ctx for get_buffer/transfer_data
+            auto src_hw_Frames_ctx_data =
+                (AVHWFramesContext *)dec_ctx.frame->hw_frames_ctx->data;
+
+            hw_frames_ctx_ = av_hwframe_ctx_alloc(hw_device_ctx_);
+            if (!hw_frames_ctx_) {
+              av_log(NULL, AV_LOG_ERROR, "Error av_hwframe_ctx_alloc\n");
+              break;
+            }
+
+            auto hw_frames_ctx_data = (AVHWFramesContext *)hw_frames_ctx_->data;
+            hw_frames_ctx_data->format = src_hw_Frames_ctx_data->format;
+            hw_frames_ctx_data->sw_format = src_hw_Frames_ctx_data->sw_format;
+            hw_frames_ctx_data->width = src_hw_Frames_ctx_data->width;
+            hw_frames_ctx_data->height = src_hw_Frames_ctx_data->height;
+            ret = av_hwframe_ctx_init(hw_frames_ctx_);
+            if (ret != 0) {
+              av_log(NULL, AV_LOG_ERROR, "Error av_hwframe_ctx_init, err %d\n",
+                     ret);
+              break;
+            }
+          }
+
+          AVFrame *new_frame = av_frame_alloc();
+          ret = av_hwframe_get_buffer(hw_frames_ctx_, new_frame, 0);
+          if (ret != 0) {
+            av_log(NULL, AV_LOG_ERROR, "Error av_hwframe_get_buffer, err %d\n",
+                   ret);
+            av_frame_free(&new_frame);
+            break;
+          }
+
+          /* retrieve data from GPU to cache */
+          if ((ret = av_hwframe_transfer_data(new_frame, dec_ctx.frame, 0)) <
+              0) {
+            av_log(NULL, AV_LOG_ERROR,
+                   "Error transferring the data to system memory, err %d\n",
+                   ret);
+            av_frame_free(&new_frame);
+            break;
+          }
+
+          ret = av_frame_copy_props(new_frame, dec_ctx.frame);
+          if (ret < 0) {
+            av_frame_free(&new_frame);
+            break;
+          }
+
+          av_frame_unref(dec_ctx.frame);
+          av_frame_move_ref(dec_ctx.frame, new_frame);
+          av_frame_free(&new_frame);
+        }
+      }
     }
 
     // callback
@@ -297,7 +429,6 @@ int Decoding::receive_frames(int stream_index) {
     }
 
     av_frame_unref(dec_ctx.frame);
-
   } while (ret == AVERROR_OK);
 
   return ret;

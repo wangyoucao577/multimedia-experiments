@@ -11,6 +11,9 @@ project (ffmpeg_tests)
 set(CMAKE_CXX_STANDARD "14")
 set(CMAKE_EXPORT_COMPILE_COMMANDS "1")
 
+# use my ffmpeg build
+set(ENV{PKG_CONFIG_PATH} "~/workspace/ffmpeg-build/build/lib/pkgconfig")
+
 find_package(PkgConfig REQUIRED)
 
 # import ffmpeg, openssl
@@ -22,6 +25,7 @@ pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET
     libavdevice
     libswresample
     libswscale
+    x264
 )
 include_directories(${LIBFFMPEG_INCLUDE_DIRS})
 pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
@@ -29,7 +33,8 @@ link_libraries(PkgConfig::LIBFFMPEG PkgConfig::OPENSSL)
 
 if (UNIX)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-link_libraries("-lx264")    # apt install libx264-dev
+link_directories(/usr/local/cuda/lib64/)
+# link_libraries("-lx264")    # apt install libx264-dev or building from source
 link_libraries("-pthread")
 endif()
 endif()

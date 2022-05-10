@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 
+#include "config_ctx.h"
 #include "libav_headers.h"
 
 using DataCallback = int(int stream_index, const AVMediaType media_type,
@@ -18,8 +19,10 @@ public:
   Decoding(const Decoding &) = delete;
   Decoding(Decoding &&) = delete;
   Decoding(const std::string &input_file,
-           std::function<DataCallback> data_callback)
-      : input_file_(input_file), data_callback_(std::move(data_callback)) {}
+           std::function<DataCallback> data_callback,
+           const std::shared_ptr<ConfigurationContext> config_ctx)
+      : input_file_(input_file), data_callback_(std::move(data_callback)),
+        config_ctx_(config_ctx) {}
   ~Decoding();
 
 public:
@@ -60,6 +63,15 @@ private:
 
   AVPacket *pkt_{nullptr};
 
+  // for HWAccel
+  AVPixelFormat hw_pix_fmt_{AV_PIX_FMT_NONE};
+  AVBufferRef *hw_device_ctx_{nullptr};
+  AVBufferRef *hw_frames_ctx_{nullptr}; // for av_frame_get_buffer/transfer_data
+  enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                                   const enum AVPixelFormat *pix_fmts);
+  int hw_decoder_init(const AVCodec *dec, AVCodecContext *ctx,
+                      const enum AVHWDeviceType type);
+
 private:
   bool opened{false};
   std::thread t_;
@@ -68,4 +80,6 @@ private:
   std::function<ErrorCallback> error_callback_ = nullptr;
 
   const std::string input_file_;
+
+  const std::shared_ptr<ConfigurationContext> config_ctx_{nullptr};
 };

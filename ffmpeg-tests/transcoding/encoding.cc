@@ -1,6 +1,43 @@
 
 #include "encoding.h"
 
+int Encoding::hw_encoder_init(AVCodecContext *ctx,
+                              const enum AVHWDeviceType type) {
+  int err = 0;
+
+  if ((err = av_hwdevice_ctx_create(&hw_device_ctx_, type, NULL, NULL, 0)) <
+      0) {
+    av_log(NULL, AV_LOG_ERROR, "Failed to create specified HW device.\n");
+    return err;
+  }
+  ctx->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
+
+  auto hw_frame_ctx = av_hwframe_ctx_alloc(hw_device_ctx_);
+  if (!hw_frame_ctx) {
+    av_log(NULL, AV_LOG_ERROR, "Failed to create hw frame context.\n");
+    return -1;
+  }
+
+  auto frames_ctx = (AVHWFramesContext *)hw_frame_ctx->data;
+  frames_ctx->format = ctx->pix_fmt;
+  frames_ctx->sw_format = ctx->sw_pix_fmt;
+  frames_ctx->width = ctx->width;
+  frames_ctx->height = ctx->height;
+  // frames_ctx->initial_pool_size = 32;
+
+  auto ret = av_hwframe_ctx_init(hw_frame_ctx);
+  if (ret < 0)
+    return ret;
+
+  ctx->hw_frames_ctx = av_buffer_ref(hw_frame_ctx);
+  av_buffer_unref(&hw_frame_ctx);
+
+  av_log(NULL, AV_LOG_VERBOSE, "encoder hw_device_ctx %p, hw_frame_ctx %p\n",
+         ctx->hw_device_ctx, ctx->hw_frames_ctx);
+
+  return err;
+}
+
 Encoding::~Encoding() { release(); }
 
 void Encoding::Close() { release(); }
@@ -29,6 +66,10 @@ void Encoding::release() {
     enc_ctx_ = nullptr;
   }
   nb_streams_ = 0;
+
+  if (hw_device_ctx_) {
+    av_buffer_unref(&hw_device_ctx_);
+  }
 
   if (ofmt_ctx_) {
     if (!(ofmt_ctx_->oformat->flags & AVFMT_NOFILE)) {
@@ -75,7 +116,13 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
     }
 
     // currently we use the same codec for encoding
-    auto encoder = avcodec_find_encoder(dec_ctx->codec_id);
+    const AVCodec *encoder = nullptr;
+    if (config_ctx_ && !config_ctx_->hw_encoder_name.empty()) {
+      encoder = avcodec_find_encoder_by_name(
+          config_ctx_->hw_encoder_name.c_str()); // hw encoder
+    } else {
+      encoder = avcodec_find_encoder(dec_ctx->codec_id);
+    }
     if (!encoder) {
       av_log(NULL, AV_LOG_ERROR, "Necessary encoder not found\n");
       release();
@@ -105,12 +152,27 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       enc_ctx->width = dec_ctx->width;
       enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
 
-      /* take first format from list of supported formats */
-      if (encoder->pix_fmts) {
-        enc_ctx->pix_fmt = encoder->pix_fmts[0];
-      } else {
-        enc_ctx->pix_fmt = dec_ctx->pix_fmt;
+      // set pix_fmt for software or hardware encoder
+      if (config_ctx_ &&
+          !config_ctx_->hw_encoder_name.empty()) { // hardware encoder
+        if (config_ctx_->hwaccel_device_type == AV_HWDEVICE_TYPE_CUDA) {
+          enc_ctx->pix_fmt = AV_PIX_FMT_CUDA;
+          enc_ctx->sw_pix_fmt = AV_PIX_FMT_YUV420P;
+        } else {
+          av_log(NULL, AV_LOG_ERROR, "unsupported device type %d\n",
+                 config_ctx_->hwaccel_device_type);
+          return -1;
+        }
+      } else { // software encoder
+        /* take first format from list of supported formats */
+        if (encoder->pix_fmts) {
+          enc_ctx->pix_fmt = encoder->pix_fmts[0];
+        } else {
+          enc_ctx->pix_fmt = dec_ctx->pix_fmt;
+        }
       }
+      av_log(NULL, AV_LOG_INFO, "encode pix_fmt %d, sw_pix_fmt %d\n",
+             enc_ctx->pix_fmt, enc_ctx->sw_pix_fmt);
 
       /* video time_base can be set to whatever is handy and supported by
        * encoder */
@@ -132,7 +194,18 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
 
-    ret = avcodec_open2(enc_ctx, encoder, nullptr);
+    if (config_ctx_ && !config_ctx_->hw_encoder_name.empty() &&
+        config_ctx_->hwaccel_device_type !=
+            AV_HWDEVICE_TYPE_NONE) { // init hardware encoder
+      ret = hw_encoder_init(enc_ctx, config_ctx_->hwaccel_device_type);
+      if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "hw_encoder_init failed, err %d\n", ret);
+        return -1;
+      }
+    }
+
+    AVDictionary *opts = NULL;
+    ret = avcodec_open2(enc_ctx, encoder, &opts);
     if (ret != 0) {
       av_log(NULL, AV_LOG_ERROR, "open codec failed, err (%d)%s\n", ret,
              av_err2str(ret));
@@ -219,10 +292,21 @@ int Encoding::RunAsync() {
 }
 
 int Encoding::pushFrame(const AVFrame *frame, AVMediaType media_type) {
-  {
+  while (true) {
     std::lock_guard<std::mutex> _(mtx_);
+
+    if (config_ctx_ && config_ctx_->max_cache_frames > 0) {
+      if (frame_queue_.size() >= config_ctx_->max_cache_frames) {
+        mtx_.unlock();
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(10ms);
+        continue;
+      }
+    }
+
     auto new_f = av_frame_clone(frame);
     frame_queue_.emplace(AVFrameWithMediaType{new_f, media_type});
+    break;
   }
   cv_.notify_one();
 
@@ -240,12 +324,25 @@ int Encoding::SendFrame(const AVFrame *frame, AVMediaType media_type) {
 int Encoding::run() {
   int finished_streams = 0;
 
+  auto last_time = std::chrono::high_resolution_clock::now();
+
   while (finished_streams != nb_streams_) {
     AVFrameWithMediaType new_frame;
     {
       std::unique_lock<std::mutex> lk(mtx_);
       if (frame_queue_.empty()) {
-        cv_.wait(lk);
+        using namespace std::chrono_literals;
+        cv_.wait_for(lk, 50ms);
+      }
+
+      auto curr_time = std::chrono::high_resolution_clock::now();
+      auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             curr_time - last_time)
+                             .count();
+      if (duration_ms >= 1000) {
+        av_log(NULL, AV_LOG_INFO, "frame queue size %lu\n",
+               frame_queue_.size());
+        last_time = curr_time;
       }
 
       if (frame_queue_.empty()) {
@@ -370,7 +467,7 @@ int Encoding::receive_packets(int stream_index, EncodingContext &enc_ctx) {
     av_packet_rescale_ts(enc_ctx.pkt, AVRational{1, 15360},
                          ofmt_ctx_->streams[stream_index]->time_base);
 
-    av_log(NULL, AV_LOG_DEBUG,
+    av_log(NULL, AV_LOG_VERBOSE,
            "[Encoding] stream %d type %s muxing frame, pts %" PRId64
            " dts %" PRId64 ", duration %" PRId64 ", time base %d/%d\n",
            stream_index,

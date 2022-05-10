@@ -1,5 +1,4 @@
 
-#include "libav_headers.h"
 
 #include <cassert>
 #include <condition_variable>
@@ -9,12 +8,17 @@
 #include <string>
 #include <thread>
 
+#include "config_ctx.h"
+#include "libav_headers.h"
+
 class Encoding {
 public:
   Encoding() = delete;
   Encoding(const Encoding &) = delete;
   Encoding(Encoding &&) = delete;
-  Encoding(const std::string &output_file) : output_file_(output_file) {}
+  Encoding(const std::string &output_file,
+           const std::shared_ptr<ConfigurationContext> config_ctx)
+      : output_file_(output_file), config_ctx_(config_ctx) {}
   ~Encoding();
 
 public:
@@ -64,6 +68,10 @@ private:
       nullptr}; // ctx per stream, length depends on `nb_streams_`
   std::set<AVMediaType> enabled_media_types_;
 
+  // for hw enc
+  int hw_encoder_init(AVCodecContext *ctx, const enum AVHWDeviceType type);
+  AVBufferRef *hw_device_ctx_{nullptr};
+
 private:
   bool opened{false};
   std::thread t_;
@@ -76,4 +84,6 @@ private:
   //   std::function<ErrorCallback> error_callback_ = nullptr;
 
   const std::string output_file_;
+
+  const std::shared_ptr<ConfigurationContext> config_ctx_{nullptr};
 };

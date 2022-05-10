@@ -1,9 +1,11 @@
 #include <memory>
 
+#include "config_ctx.h"
 #include "decoding.h"
 #include "encoding.h"
 
 int main(int argc, char *argv[]) {
+  av_log_set_level(AV_LOG_INFO);
   if (argc != 3) {
     av_log(NULL, AV_LOG_ERROR, "Usage: %s <input file> <output file>\n",
            argv[0]);
@@ -14,7 +16,16 @@ int main(int argc, char *argv[]) {
   av_log(NULL, AV_LOG_INFO, "transcoding task: %s -> %s\n", input_url,
          output_url);
 
-  auto enc = std::make_unique<Encoding>(output_url);
+  // configuration
+  std::shared_ptr<ConfigurationContext> config_ctx =
+      std::make_shared<ConfigurationContext>();
+  // config_ctx->hwaccel_device_type = AV_HWDEVICE_TYPE_CUDA;
+  // config_ctx->hwaccel_output_format_cuda = true;
+  // config_ctx->hw_encoder_name = "h264_nvenc";
+  // config_ctx->enable_cuda_frames_caching = true;
+  config_ctx->max_cache_frames = 60;
+
+  auto enc = std::make_unique<Encoding>(output_url, config_ctx);
 
   int64_t total_decoded_video = 0, total_decoded_audio = 0;
   auto data_func = [&total_decoded_video, &total_decoded_audio,
@@ -30,10 +41,10 @@ int main(int argc, char *argv[]) {
              stream_index, av_get_media_type_string(media_type));
     } else {
       if (media_type == AVMEDIA_TYPE_VIDEO) {
-        av_log(NULL, AV_LOG_DEBUG,
-               "stream %d frame pict_type %c, pts %" PRId64 ", pkt_dts %" PRId64
-               ", pkt_duration %" PRId64 ", best_effort_timestamp %" PRId64
-               ", time_base %d/%d\n",
+        av_log(NULL, AV_LOG_VERBOSE,
+               "decoded callback stream %d frame pict_type %c, pts %" PRId64
+               ", pkt_dts %" PRId64 ", pkt_duration %" PRId64
+               ", best_effort_timestamp %" PRId64 ", time_base %d/%d\n",
                stream_index, av_get_picture_type_char(f->pict_type), f->pts,
                f->pkt_dts, f->pkt_duration, f->best_effort_timestamp,
                f->time_base.num, f->time_base.den);
@@ -57,7 +68,8 @@ int main(int argc, char *argv[]) {
     return 0;
   };
 
-  auto dec = std::make_unique<Decoding>(input_url, std::move(data_func));
+  auto dec =
+      std::make_unique<Decoding>(input_url, std::move(data_func), config_ctx);
   auto ret = dec->Open();
   if (ret != AVERROR_OK) {
     return ret;
