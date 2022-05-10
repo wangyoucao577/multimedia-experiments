@@ -9,3 +9,5 @@ extern "C" {
 }
 
 constexpr static int AVERROR_OK = 0;
+
+const AVRational kFundamentalTimeBase = AVRational{1, 100000}; // 10 ns

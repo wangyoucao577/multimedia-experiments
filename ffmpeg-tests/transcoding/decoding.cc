@@ -248,7 +248,10 @@ int Decoding::run() {
       continue; // ignored stream
     }
 
-    av_log(NULL, AV_LOG_DEBUG,
+    av_packet_rescale_ts(pkt_, ifmt_ctx_->streams[i]->time_base,
+                         kFundamentalTimeBase); // convert to unified timebase
+
+    av_log(NULL, AV_LOG_VERBOSE,
            "<decoding> stream %d type %s read packet pts %" PRId64
            ", dts %" PRId64 ", duration %" PRId64 ", time_base %d/%d\n",
            i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
@@ -271,7 +274,7 @@ int Decoding::run() {
     assert(ret != AVERROR_OK);
     if (ret == AVERROR(EAGAIN)) {
       if (dec_ctx_[i].out_count == 0) {
-        av_log(NULL, AV_LOG_INFO,
+        av_log(NULL, AV_LOG_VERBOSE,
                "<Decoding> stream %d type %s no packet available, curr in %d, "
                "fill in "
                "more data and try "

@@ -32,9 +32,6 @@ int Encoding::hw_encoder_init(AVCodecContext *ctx,
   ctx->hw_frames_ctx = av_buffer_ref(hw_frame_ctx);
   av_buffer_unref(&hw_frame_ctx);
 
-  av_log(NULL, AV_LOG_VERBOSE, "encoder hw_device_ctx %p, hw_frame_ctx %p\n",
-         ctx->hw_device_ctx, ctx->hw_frames_ctx);
-
   return err;
 }
 
@@ -171,13 +168,13 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
           enc_ctx->pix_fmt = dec_ctx->pix_fmt;
         }
       }
-      av_log(NULL, AV_LOG_INFO, "encode pix_fmt %d, sw_pix_fmt %d\n",
+      av_log(NULL, AV_LOG_VERBOSE, "encode pix_fmt %d, sw_pix_fmt %d\n",
              enc_ctx->pix_fmt, enc_ctx->sw_pix_fmt);
 
       /* video time_base can be set to whatever is handy and supported by
        * encoder */
       enc_ctx->time_base = av_inv_q(dec_ctx->framerate);
-      av_log(NULL, AV_LOG_INFO,
+      av_log(NULL, AV_LOG_VERBOSE,
              "[encoding] stream %d type %s set codec time base %d/%d from "
              "decode framerate %d/%d\n",
              stream_index, av_get_media_type_string(enc_ctx->codec_type),
@@ -222,7 +219,7 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
     }
     stream->time_base = enc_ctx->time_base;
     av_log(
-        NULL, AV_LOG_INFO,
+        NULL, AV_LOG_VERBOSE,
         "[encoding] stream %d type %s time_base %d/%d, codec time_base %d/%d\n",
         stream_index, av_get_media_type_string(enc_ctx->codec_type),
         ofmt_ctx_->streams[0]->time_base.num,
@@ -255,7 +252,7 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
 
   for (int i = 0; i < nb_streams_; ++i) {
     av_log(
-        NULL, AV_LOG_INFO,
+        NULL, AV_LOG_VERBOSE,
         "[encoding] after avformat_write_header, stream %d type %s time_base "
         "%d/%d\n",
         i,
@@ -340,7 +337,7 @@ int Encoding::run() {
                              curr_time - last_time)
                              .count();
       if (duration_ms >= 1000) {
-        av_log(NULL, AV_LOG_INFO, "frame queue size %lu\n",
+        av_log(NULL, AV_LOG_VERBOSE, "frame queue size %lu\n",
                frame_queue_.size());
         last_time = curr_time;
       }
@@ -361,6 +358,19 @@ int Encoding::run() {
         av_frame_free(&new_frame.frame);
       }
       continue;
+    }
+
+    if (new_frame.frame) { // convert to encoder time base,
+                           // nvenc may output dts<pts without this
+      new_frame.frame->pts =
+          av_rescale_q(new_frame.frame->pts, kFundamentalTimeBase,
+                       enc_ctx_->codec_ctx->time_base);
+      new_frame.frame->pkt_dts =
+          av_rescale_q(new_frame.frame->pkt_dts, kFundamentalTimeBase,
+                       enc_ctx_->codec_ctx->time_base);
+      new_frame.frame->pkt_duration =
+          av_rescale_q(new_frame.frame->pkt_duration, kFundamentalTimeBase,
+                       enc_ctx_->codec_ctx->time_base);
     }
 
     auto &enc_ctx = enc_ctx_[stream_index];
@@ -385,7 +395,7 @@ int Encoding::run() {
     assert(ret != AVERROR_OK);
     if (ret == AVERROR(EAGAIN)) {
       if (enc_ctx.out_count == 0) {
-        av_log(NULL, AV_LOG_INFO,
+        av_log(NULL, AV_LOG_VERBOSE,
                "[Encoding] stream %d type %s no packet available, curr in %d, "
                "fill in "
                "more data and try "
@@ -463,17 +473,17 @@ int Encoding::receive_packets(int stream_index, EncodingContext &enc_ctx) {
     /* prepare packet for muxing */
     enc_ctx.pkt->stream_index = stream_index;
 
-    // TODO: use in-stream time_base
-    av_packet_rescale_ts(enc_ctx.pkt, AVRational{1, 15360},
+    av_packet_rescale_ts(enc_ctx.pkt, enc_ctx.codec_ctx->time_base,
                          ofmt_ctx_->streams[stream_index]->time_base);
 
     av_log(NULL, AV_LOG_VERBOSE,
-           "[Encoding] stream %d type %s muxing frame, pts %" PRId64
+           "[Encoding] stream %d type %s muxing frame count %d, pts %" PRId64
            " dts %" PRId64 ", duration %" PRId64 ", time base %d/%d\n",
            stream_index,
            av_get_media_type_string(enc_ctx.codec_ctx->codec_type),
-           enc_ctx.pkt->pts, enc_ctx.pkt->dts, enc_ctx.pkt->duration,
-           enc_ctx.pkt->time_base.num, enc_ctx.pkt->time_base.den);
+           enc_ctx.out_count, enc_ctx.pkt->pts, enc_ctx.pkt->dts,
+           enc_ctx.pkt->duration, enc_ctx.pkt->time_base.num,
+           enc_ctx.pkt->time_base.den);
 
     /* mux encoded frame */
     ret = av_interleaved_write_frame(ofmt_ctx_, enc_ctx.pkt);

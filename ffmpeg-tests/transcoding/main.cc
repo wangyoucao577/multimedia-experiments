@@ -32,12 +32,14 @@ int main(int argc, char *argv[]) {
                     &enc](int stream_index, const AVMediaType media_type,
                           AVFrame *f) -> int {
     if (!f) {
-      av_log(NULL, AV_LOG_ERROR, "stream %d media_type %s result null frame\n",
+      av_log(NULL, AV_LOG_ERROR,
+             "decoded callback stream %d media_type %s result null frame\n",
              stream_index, av_get_media_type_string(media_type));
     }
     if (!f->buf[0]) {
       av_log(NULL, AV_LOG_INFO,
-             "stream %d media_type %s result blank frame for flushing\n",
+             "decoded callback stream %d media_type %s result blank frame for "
+             "flushing\n",
              stream_index, av_get_media_type_string(media_type));
     } else {
       if (media_type == AVMEDIA_TYPE_VIDEO) {
@@ -92,7 +94,8 @@ int main(int argc, char *argv[]) {
   enc->Close();
 
   av_log(NULL, AV_LOG_INFO,
-         "total decoded video frames %" PRId64 " audio samples %" PRId64 "\n",
+         "transcoding done, total decoded video frames %" PRId64
+         " audio samples %" PRId64 "\n",
          total_decoded_video, total_decoded_audio);
 
   return 0;
