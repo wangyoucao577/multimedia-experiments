@@ -13,6 +13,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS "1")
 
 # use my ffmpeg build
 set(ENV{PKG_CONFIG_PATH} "~/workspace/ffmpeg-build/build/lib/pkgconfig")
+if (APPLE)
+# brew installed libs normal has prefix '/usr/local', which can be retrieved by `brew --prefix` 
+set(ENV{PKG_CONFIG_PATH} "/usr/local/opt/openssl/lib/pkgconfig:ENV{PKG_CONFIG_PATH}")
+endif()
 
 find_package(PkgConfig REQUIRED)
 
@@ -39,7 +43,8 @@ link_libraries("-pthread")
 endif()
 endif()
 
-aux_source_directory(transcoding TRANSCODING_SRCS)
-file(GLOB TRANSCODING_HEADERS "transcoding/*.h")
+# transcoding
+add_subdirectory(transcoding)
 
-add_executable ("transcoding" ${TRANSCODING_SRCS} ${TRANSCODING_HEADERS})
+# danger tutorials
+add_subdirectory(danger-tutorials)
