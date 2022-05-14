@@ -30,6 +30,7 @@ pkg_check_modules(LIBFFMPEG REQUIRED IMPORTED_TARGET
     libswresample
     libswscale
     x264
+    sdl2
 )
 include_directories(${LIBFFMPEG_INCLUDE_DIRS})
 pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
