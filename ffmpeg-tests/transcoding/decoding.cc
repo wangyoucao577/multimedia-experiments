@@ -131,10 +131,8 @@ int Decoding::Open() {
     auto stream = ifmt_ctx_->streams[i];
     assert(stream);
 
-    // TODO: disable audio currently
-    //  if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
-    //      stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
-    if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
+    if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
+        stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
       av_log(NULL, AV_LOG_WARNING, "ignore non A/V stream %d, type (%d)%s\n", i,
              stream->codecpar->codec_type,
              av_get_media_type_string(stream->codecpar->codec_type));
@@ -171,16 +169,17 @@ int Decoding::Open() {
     if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
       dec_ctx_[i].codec_ctx->framerate =
           av_guess_frame_rate(ifmt_ctx_, stream, NULL);
-    }
 
-    if (config_ctx_ && config_ctx_->hwaccel_device_type ==
-                           AV_HWDEVICE_TYPE_CUDA) { // hwaccel cuda
+      // hwaccel cuda, video  only
+      if (config_ctx_ &&
+          config_ctx_->hwaccel_device_type == AV_HWDEVICE_TYPE_CUDA) {
 
-      ret = hw_decoder_init(dec, dec_ctx_[i].codec_ctx,
-                            config_ctx_->hwaccel_device_type);
-      if (ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "hw_decoder_init failed, ret %d\n", ret);
-        return ret;
+        ret = hw_decoder_init(dec, dec_ctx_[i].codec_ctx,
+                              config_ctx_->hwaccel_device_type);
+        if (ret < 0) {
+          av_log(NULL, AV_LOG_ERROR, "hw_decoder_init failed, ret %d\n", ret);
+          return ret;
+        }
       }
     }
 
@@ -362,15 +361,17 @@ int Decoding::receive_frames(int stream_index) {
     if (ret == AVERROR_OK) {
       dec_ctx.out_count++;
 
-      if (config_ctx_ && config_ctx_->hwaccel_device_type ==
-                             AV_HWDEVICE_TYPE_CUDA) { // hwaccel cuda
+      if (dec_ctx.codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO && config_ctx_ &&
+          config_ctx_->hwaccel_device_type ==
+              AV_HWDEVICE_TYPE_CUDA) { // hwaccel cuda
 
         if (dec_ctx.frame != nullptr &&
             config_ctx_->hwaccel_output_format_cuda &&
             config_ctx_->enable_cuda_frames_caching) {
           // caches frames in cuda memory, not in decoder's internal memory
 
-          if (!hw_frames_ctx_) { // get frames ctx for get_buffer/transfer_data
+          if (!hw_frames_ctx_) { // get frames ctx for
+                                 // get_buffer/transfer_data
             auto src_hw_Frames_ctx_data =
                 (AVHWFramesContext *)dec_ctx.frame->hw_frames_ctx->data;
 

@@ -114,7 +114,8 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
 
     // currently we use the same codec for encoding
     const AVCodec *encoder = nullptr;
-    if (config_ctx_ && !config_ctx_->hw_encoder_name.empty()) {
+    if (dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO && config_ctx_ &&
+        !config_ctx_->hw_encoder_name.empty()) {
       encoder = avcodec_find_encoder_by_name(
           config_ctx_->hw_encoder_name.c_str()); // hw encoder
     } else {
@@ -181,8 +182,11 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
              enc_ctx->time_base.num, enc_ctx->time_base.den,
              dec_ctx->framerate.num, dec_ctx->framerate.den);
     } else if (dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
-      // TODO:
-      assert(false);
+      enc_ctx->bit_rate = 192000;
+      enc_ctx->sample_rate = dec_ctx->sample_rate;
+      enc_ctx->sample_fmt = dec_ctx->sample_fmt;
+      enc_ctx->channels = dec_ctx->channels;
+      enc_ctx->channel_layout = dec_ctx->channel_layout;
     } else {
       assert(false);
     }
@@ -191,7 +195,8 @@ int Encoding::Open(const AVCodecContext *v_dec_ctx,
       enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
 
-    if (config_ctx_ && !config_ctx_->hw_encoder_name.empty() &&
+    if (v_dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO && config_ctx_ &&
+        !config_ctx_->hw_encoder_name.empty() &&
         config_ctx_->hwaccel_device_type !=
             AV_HWDEVICE_TYPE_NONE) { // init hardware encoder
       ret = hw_encoder_init(enc_ctx, config_ctx_->hwaccel_device_type);

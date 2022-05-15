@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
                f->time_base.num, f->time_base.den);
         ++total_decoded_video;
       } else if (media_type == AVMEDIA_TYPE_AUDIO) {
-        // av_log(NULL, AV_LOG_INFO, "stream %d frame samples %d\n",
-        // stream_index,
-        //        f->nb_samples);
+        av_log(NULL, AV_LOG_VERBOSE,
+               "decoded callback stream %d frame samples %d\n", stream_index,
+               f->nb_samples);
         total_decoded_audio += f->nb_samples;
       }
       // ignore other types
@@ -79,7 +79,8 @@ int main(int argc, char *argv[]) {
   dec->DumpInputFormat();
   av_log(NULL, AV_LOG_INFO, "\n\n\n");
 
-  ret = enc->Open(dec->CodecContext(AVMEDIA_TYPE_VIDEO), nullptr);
+  ret = enc->Open(dec->CodecContext(AVMEDIA_TYPE_VIDEO),
+                  dec->CodecContext(AVMEDIA_TYPE_AUDIO));
   if (ret != AVERROR_OK) {
     return ret;
   }
