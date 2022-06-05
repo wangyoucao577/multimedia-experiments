@@ -8,7 +8,7 @@ endif(UNIX)
 
 project (ffmpeg_tests)
 
-set(CMAKE_CXX_STANDARD "14")
+set(CMAKE_CXX_STANDARD "17")
 set(CMAKE_EXPORT_COMPILE_COMMANDS "1")
 
 # use my ffmpeg build
@@ -46,4 +46,7 @@ endif()
 
 # transcoding
 add_subdirectory(transcoding)
+
+# player
+add_subdirectory(player)
 
