@@ -47,5 +47,3 @@ endif()
 # transcoding
 add_subdirectory(transcoding)
 
-# danger tutorials
-add_subdirectory(danger-tutorials)
