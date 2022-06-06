@@ -24,7 +24,8 @@ $ docker pull ghcr.io/wangyoucao577/multimedia-experiments/nginx
 
 ### Run container 
 ```bash
-$ docker run -d --restart=always -p 8080:8080 -p 1935:1935 --shm-size=32g ghcr.io/wangyoucao577/multimedia-experiments/nginx
+# `--mount "src=$(pwd),dst=/files,type=bind"` could be removed if no need as a generic file server
+$ docker run -d --restart=always -p 8080:8080 -p 1935:1935 --shm-size=32g --mount "src=$(pwd),dst=/files,type=bind" ghcr.io/wangyoucao577/multimedia-experiments/nginx
 4dce06ca751f4ee803df809396b8e1ed830f496ed530f52476034a92d35c8fe2
 $ 
 ```
