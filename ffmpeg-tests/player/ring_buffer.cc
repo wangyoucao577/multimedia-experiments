@@ -1,6 +1,8 @@
 
 #include "ring_buffer.h"
 
+#include <cassert>
+
 RingBuffer::RingBuffer(int capacity)
     : capacity_(capacity), buffer_(std::make_unique<uint8_t[]>(capacity)) {}
 

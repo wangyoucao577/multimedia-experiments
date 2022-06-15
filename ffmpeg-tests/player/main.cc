@@ -1,6 +1,12 @@
 
+
+#if defined(_WIN32)
+#define SDL_MAIN_HANDLED
+#endif
+
 #include "decoder.h"
 #include "player.h"
+
 
 int main(int argc, char *argv[]) {
 
