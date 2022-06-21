@@ -295,11 +295,11 @@ int Encoding::RunAsync() {
 
 int Encoding::pushFrame(const AVFrame *frame, AVMediaType media_type) {
   while (true) {
-    std::lock_guard<std::mutex> _(mtx_);
+    std::unique_lock<std::mutex> mtx(mtx_);
 
     if (config_ctx_ && config_ctx_->max_cache_frames > 0) {
       if (frame_queue_.size() >= config_ctx_->max_cache_frames) {
-        mtx_.unlock();
+        mtx.unlock();
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(10ms);
         continue;
@@ -364,21 +364,21 @@ int Encoding::run() {
       }
       continue;
     }
+    auto &enc_ctx = enc_ctx_[stream_index];
 
     if (new_frame.frame) { // convert to encoder time base,
                            // nvenc may output dts<pts without this
       new_frame.frame->pts =
           av_rescale_q(new_frame.frame->pts, kFundamentalTimeBase,
-                       enc_ctx_->codec_ctx->time_base);
+                       enc_ctx.codec_ctx->time_base);
       new_frame.frame->pkt_dts =
           av_rescale_q(new_frame.frame->pkt_dts, kFundamentalTimeBase,
-                       enc_ctx_->codec_ctx->time_base);
+                       enc_ctx.codec_ctx->time_base);
       new_frame.frame->pkt_duration =
           av_rescale_q(new_frame.frame->pkt_duration, kFundamentalTimeBase,
-                       enc_ctx_->codec_ctx->time_base);
+                       enc_ctx.codec_ctx->time_base);
     }
 
-    auto &enc_ctx = enc_ctx_[stream_index];
     auto ret = avcodec_send_frame(enc_ctx.codec_ctx, new_frame.frame);
     if (new_frame.frame) {
       if (new_frame.frame->buf[0]) {
