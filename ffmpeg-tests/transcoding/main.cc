@@ -31,11 +31,7 @@ int main(int argc, char *argv[]) {
   auto data_func = [&total_decoded_video, &total_decoded_audio,
                     &enc](int stream_index, const AVMediaType media_type,
                           AVFrame *f) -> int {
-    if (!f) {
-      av_log(NULL, AV_LOG_ERROR,
-             "decoded callback stream %d media_type %s result null frame\n",
-             stream_index, av_get_media_type_string(media_type));
-    }
+    assert(f);
     if (!f->buf[0]) {
       av_log(NULL, AV_LOG_INFO,
              "decoded callback stream %d media_type %s result blank frame for "
