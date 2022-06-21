@@ -107,7 +107,7 @@ int Decoder::Open() {
     }
 
     AVDictionary *opts = NULL;
-     av_dict_set(&opts, "threads", "auto", 0);
+    av_dict_set(&opts, "threads", "auto", 0);
     ret = avcodec_open2(dec_ctx_[i].codec_ctx, dec, &opts);
     if (ret != 0) {
       av_log(NULL, AV_LOG_ERROR, "open codec failed, err (%d)%s\n", ret,
@@ -177,8 +177,13 @@ int Decoder::run() {
            "<decoding> stream %d type %s read packet pts %" PRId64
            ", dts %" PRId64 ", duration %" PRId64 ", time_base %d/%d\n",
            i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
-           pkt_->pts, pkt_->dts, pkt_->duration, pkt_->time_base.num,
-           pkt_->time_base.den);
+           pkt_->pts, pkt_->dts, pkt_->duration,
+#if LIBAVCODEC_VERSION_MAJOR >= 59 && LIBAVCODEC_VERSION_MINOR >= 4
+           pkt_->time_base.num, pkt_->time_base.den
+#else
+           0, 0
+#endif
+    );
 
     ret = avcodec_send_packet(dec_ctx_[i].codec_ctx, pkt_);
     dec_ctx_[i].in_count++;

@@ -487,8 +487,13 @@ int Encoding::receive_packets(int stream_index, EncodingContext &enc_ctx) {
            stream_index,
            av_get_media_type_string(enc_ctx.codec_ctx->codec_type),
            enc_ctx.out_count, enc_ctx.pkt->pts, enc_ctx.pkt->dts,
-           enc_ctx.pkt->duration, enc_ctx.pkt->time_base.num,
-           enc_ctx.pkt->time_base.den);
+           enc_ctx.pkt->duration,
+#if LIBAVCODEC_VERSION_MAJOR >= 59 && LIBAVCODEC_VERSION_MINOR >= 4
+           enc_ctx.pkt->time_base.num, enc_ctx.pkt->time_base.den
+#else
+           0, 0
+#endif
+    );
 
     /* mux encoded frame */
     ret = av_interleaved_write_frame(ofmt_ctx_, enc_ctx.pkt);

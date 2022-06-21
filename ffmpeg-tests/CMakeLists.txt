@@ -18,12 +18,17 @@ option(ENABLE_PLAYER "Enable player" ON)
 
 
 if (WIN32)
+    # vcpkg installed ffmpeg
+    find_package(FFMPEG REQUIRED)
+    include_directories(${FFMPEG_INCLUDE_DIRS})
+    link_libraries(${FFMPEG_LIBRARIES})
 
-    set(FFMPEG_INCLUDE_DIR "e:/ffmpeg-build/build/include")
-    include_directories(${FFMPEG_INCLUDE_DIR})
-    link_directories(${FFMPEG_INCLUDE_DIR}/../bin ${FFMPEG_INCLUDE_DIR}/../lib)
-    # only need to link ffmpeg libraries since all its dependencies have been linked inside
-    link_libraries(avfilter avformat avdevice avcodec swresample swscale avutil)
+    # use prebuilt binary by yourself
+    # set(FFMPEG_INCLUDE_DIR "e:/ffmpeg-build/build/include")
+    # include_directories(${FFMPEG_INCLUDE_DIR})
+    # link_directories(${FFMPEG_INCLUDE_DIR}/../bin ${FFMPEG_INCLUDE_DIR}/../lib)
+    # # only need to link ffmpeg libraries since all its dependencies have been linked inside
+    # link_libraries(avfilter avformat avdevice avcodec swresample swscale avutil)
 else()
 
     # use my ffmpeg build

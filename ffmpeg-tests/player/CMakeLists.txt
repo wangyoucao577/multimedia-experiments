@@ -8,9 +8,14 @@ file(GLOB PLAYER_HEADERS "*.h")
 add_executable (${PROJECT_NAME} ${PLAYER_SRCS} ${PLAYER_HEADERS})
 
 if (WIN32)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2/SDL2-devel-2.0.22-VC/SDL2-2.0.22/include)
-    # link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2-devel-2.0.22-VC/SDL2-2.0.22/lib/x64)
-    target_link_libraries(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2/SDL2-devel-2.0.22-VC/SDL2-2.0.22/lib/x64/SDL2.lib)
+    # vcpkg installed SDL2 
+    find_package(SDL2 CONFIG REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 SDL2::SDL2main SDL2::SDL2-static)
+
+    # if download SDL2 prebuilt binary by yourself
+    # include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2/SDL2-devel-2.0.22-VC/SDL2-2.0.22/include)
+    # # link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2-devel-2.0.22-VC/SDL2-2.0.22/lib/x64)
+    # target_link_libraries(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/SDL2/SDL2-devel-2.0.22-VC/SDL2-2.0.22/lib/x64/SDL2.lib)
 else()
     pkg_check_modules(LIBSDL2 REQUIRED IMPORTED_TARGET sdl2)
     target_link_libraries(${PROJECT_NAME} PkgConfig::LIBSDL2)

@@ -7,7 +7,6 @@
 #include "decoder.h"
 #include "player.h"
 
-
 int main(int argc, char *argv[]) {
 
   av_log_set_level(AV_LOG_INFO);
@@ -45,7 +44,12 @@ int main(int argc, char *argv[]) {
                ", best_effort_timestamp %" PRId64 ", time_base %d/%d\n",
                stream_index, av_get_picture_type_char(f->pict_type), f->pts,
                f->pkt_dts, f->pkt_duration, f->best_effort_timestamp,
-               f->time_base.num, f->time_base.den);
+#if LIBAVUTIL_VERSION_MAJOR >= 57 && LIBAVUTIL_VERSION_MINOR >= 10
+               f->time_base.num, f->time_base.den
+#else
+               0, 0
+#endif
+        );
         ++total_decoded_video;
       } else if (media_type == AVMEDIA_TYPE_AUDIO) {
         av_log(NULL, AV_LOG_VERBOSE,
