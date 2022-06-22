@@ -21,12 +21,12 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 
 
 int Player::PushAudioFrame(AVFrame *f) {
-  if (!opened_ || flushed_) {   // don't allow push data again if flushed
+  if (!opened_ || audio_flushed_) {   // don't allow push data again if flushed
     return 0;
   }
 
   if (!f || !f->data[0]) { // empty frame, no more data will be pushed
-    flushed_.store(true);
+    audio_flushed_.store(true);
     return 0;
   }
 
@@ -96,7 +96,7 @@ int Player::Close() {
   }
 
   // wait until all data consumed if flushed
-  if (flushed_) {
+  if (audio_flushed_) {
     while (true) {
       using namespace std::chrono_literals;
       std::unique_lock<std::mutex> l(audio_buffer_mutex_);
@@ -109,8 +109,11 @@ int Player::Close() {
 
   opened_.store(false);
 
-  SDL_CloseAudio();
-  flushed_.store(false);
+  if (audio_device_id_ > 0) {
+    SDL_CloseAudioDevice(audio_device_id_);
+    audio_device_id_ = 0;
+  }
+  audio_flushed_.store(false);
 
   if (texture_) {
     SDL_DestroyTexture(texture_);
@@ -212,9 +215,9 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     wanted_spec.samples = 1024; 
     wanted_spec.callback = sdl_audio_callback;
     wanted_spec.userdata = this;
-    auto device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec_,
+    audio_device_id_ = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec_,
                               SDL_AUDIO_ALLOW_ANY_CHANGE);
-    if (device_id <= 0) {
+    if (audio_device_id_ <= 0) {
       SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_OpenAudio failed, err %s",
                    SDL_GetError());
       return -1;
@@ -230,7 +233,7 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
         wanted_spec.channels, wanted_spec.freq, audio_spec_.channels,
         audio_spec_.freq);
 
-    SDL_PauseAudioDevice(device_id, 0);
+    SDL_PauseAudioDevice(audio_device_id_, 0);
   }
 
 #if defined(SAVE_PLAYBACK_AUDIO)

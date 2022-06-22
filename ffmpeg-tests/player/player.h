@@ -40,15 +40,16 @@ private:
   std::mutex audio_buffer_mutex_;
   std::condition_variable audio_buffer_cv_;
   const int kAudioBufferSizeInBytes = 1024000; // 1MB
+  std::atomic_bool audio_flushed_{false};
 
   SDL_AudioSpec audio_spec_;
   SwrContext *swr_ctx_{nullptr};
+  int audio_device_id_{0};
 
 private:
   const bool enable_video_{false};
   const bool enable_audio_{false};
   std::atomic_bool opened_{false};
-  std::atomic_bool flushed_{false};
 
 #if defined(SAVE_PLAYBACK_AUDIO)
 public:
