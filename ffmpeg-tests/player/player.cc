@@ -21,9 +21,15 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 
 
 int Player::PushAudioFrame(AVFrame *f) {
-  if (!f) {
-    return -1;  // TODO: NULL to flush
+  if (!opened_ || flushed_) {   // don't allow push data again if flushed
+    return 0;
   }
+
+  if (!f || !f->data[0]) { // empty frame, no more data will be pushed
+    flushed_.store(true);
+    return 0;
+  }
+
   if (swr_ctx_ == nullptr) { // use libswresample to convert for SDL playout
     swr_ctx_ = swr_alloc_set_opts(
         NULL, // we're allocating a new context
@@ -58,7 +64,7 @@ int Player::PushAudioFrame(AVFrame *f) {
 
 
 int Player::PopAudioData(unsigned char *data, int len) {
-  if (!opened) {
+  if (!opened_) {
     return 0;
   }
 
@@ -68,12 +74,9 @@ int Player::PopAudioData(unsigned char *data, int len) {
 }
 
 int Player::PushAudioData(unsigned char *data, int len) {
-  if (!opened) {
-    return 0;
-  }
 
   int pushed_n = 0;
-  while (opened) {
+  while (opened_) {
     auto n = audio_buffer_->Write(data, len);
     pushed_n += n;
     if (pushed_n == len) { // until all data has been write
@@ -88,13 +91,26 @@ int Player::PushAudioData(unsigned char *data, int len) {
 }
 
 int Player::Close() {
-  if (!opened) {
+  if (!opened_) {
     return 0;
   }
 
-  opened = false;
+  // wait until all data consumed if flushed
+  if (flushed_) {
+    while (true) {
+      using namespace std::chrono_literals;
+      std::unique_lock<std::mutex> l(audio_buffer_mutex_);
+      if (audio_buffer_cv_.wait_for(
+              l, 10ms, [this] { return audio_buffer_->Size() == 0; })) {
+        break;   // if audio buffer is empty
+      }
+    }
+  }
+
+  opened_.store(false);
 
   SDL_CloseAudio();
+  flushed_.store(false);
 
   if (texture_) {
     SDL_DestroyTexture(texture_);
@@ -129,7 +145,7 @@ int Player::Close() {
 
 int Player::Open(const AVCodecContext *v_dec_ctx,
                  const AVCodecContext *a_dec_ctx) {
-  if (opened) {
+  if (opened_) {
     return 0;
   }
 
@@ -221,6 +237,6 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
   audio_file = fopen("test_player.pcm", "w+");
 #endif
 
-  opened = true;
+  opened_ = true;
   return 0;
 }

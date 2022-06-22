@@ -16,24 +16,21 @@ int main(int argc, char *argv[]) {
   }
   const char *input_url = argv[1];
 
-  // convert AV_SAMPLE_FMT_FLTP to AV_SAMPLE_FMT_S16
-  SwrContext *swr_ctx = nullptr;
-
   auto player = std::make_unique<Player>(false, true);
-  // TODO: set codec parameters to player
 
   int64_t total_decoded_video = 0, total_decoded_audio = 0;
-  auto data_func = [&total_decoded_video, &total_decoded_audio, &player,
-                    &swr_ctx](int stream_index, const AVMediaType media_type,
-                              AVFrame *f) -> int {
+  auto data_func = [&total_decoded_video, &total_decoded_audio,
+                    &player](int stream_index, const AVMediaType media_type,
+                             AVFrame *f) -> int {
     assert(f);
-    if (!f->buf[0]) {
-      av_log(NULL, AV_LOG_INFO,
-             "decoded callback stream %d media_type %s result blank frame for "
-             "flushing\n",
-             stream_index, av_get_media_type_string(media_type));
-    } else {
-      if (media_type == AVMEDIA_TYPE_VIDEO) {
+    if (media_type == AVMEDIA_TYPE_VIDEO) {
+      if (!f->buf[0]) {
+        av_log(
+            NULL, AV_LOG_INFO,
+            "decoded callback stream %d media_type %s result blank frame for "
+            "flushing\n",
+            stream_index, av_get_media_type_string(media_type));
+      } else {
         av_log(NULL, AV_LOG_VERBOSE,
                "decoded callback stream %d frame pict_type %c, pts %" PRId64
                ", pkt_dts %" PRId64 ", pkt_duration %" PRId64
@@ -46,17 +43,25 @@ int main(int argc, char *argv[]) {
                0, 0
 #endif
         );
+
         ++total_decoded_video;
-      } else if (media_type == AVMEDIA_TYPE_AUDIO) {
+      }
+    } else if (media_type == AVMEDIA_TYPE_AUDIO) {
+      if (!f->buf[0]) {
+        av_log(
+            NULL, AV_LOG_INFO,
+            "decoded callback stream %d media_type %s result blank frame for "
+            "flushing\n",
+            stream_index, av_get_media_type_string(media_type));
+      } else {
         av_log(NULL, AV_LOG_VERBOSE,
                "decoded callback stream %d frame samples %d\n", stream_index,
                f->nb_samples);
         total_decoded_audio += f->nb_samples;
-
-        player->PushAudioFrame(f);
       }
-      // ignore other types
+      player->PushAudioFrame(f);
     }
+    // ignore other types
 
     return 0;
   };
@@ -85,7 +90,6 @@ int main(int argc, char *argv[]) {
   dec->Close();
   player->Close();
 
- 
   av_log(NULL, AV_LOG_INFO,
          "playing done, total decoded video frames %" PRId64
          " audio samples %" PRId64 "\n",

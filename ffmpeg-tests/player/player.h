@@ -25,7 +25,7 @@ public:
 public:
   int Open(const AVCodecContext *v_dec_ctx, const AVCodecContext *a_dec_ctx);
   int Close();
-  bool Opened() const { return opened; }
+  bool Opened() const { return opened_; }
 
   int PushAudioFrame(AVFrame *f);
   int PushAudioData(unsigned char *data, int len);
@@ -47,7 +47,8 @@ private:
 private:
   const bool enable_video_{false};
   const bool enable_audio_{false};
-  std::atomic_bool opened{false};
+  std::atomic_bool opened_{false};
+  std::atomic_bool flushed_{false};
 
 #if defined(SAVE_PLAYBACK_AUDIO)
 public:
