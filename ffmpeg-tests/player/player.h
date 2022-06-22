@@ -23,10 +23,11 @@ public:
   ~Player() = default;
 
 public:
-  int Open();
+  int Open(const AVCodecContext *v_dec_ctx, const AVCodecContext *a_dec_ctx);
   int Close();
   bool Opened() const { return opened; }
 
+  int PushAudioFrame(AVFrame *f);
   int PushAudioData(unsigned char *data, int len);
   int PopAudioData(unsigned char *data, int len);
 
@@ -39,6 +40,9 @@ private:
   std::mutex audio_buffer_mutex_;
   std::condition_variable audio_buffer_cv_;
   const int kAudioBufferSizeInBytes = 1024000; // 1MB
+
+  SDL_AudioSpec audio_spec_;
+  SwrContext *swr_ctx_{nullptr};
 
 private:
   const bool enable_video_{false};

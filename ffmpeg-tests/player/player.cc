@@ -1,5 +1,6 @@
 
 #include "player.h"
+#include <cassert>
 
 void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
   auto player = (Player *)userdata;
@@ -9,7 +10,7 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 
   auto n = player->PopAudioData(stream, len);
   if (n != len) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                  "audio playback requires %d bytes but only got %d", len, n);
   }
 
@@ -17,6 +18,44 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
   fwrite(stream, len, 1, player->audio_file);
 #endif
 }
+
+
+int Player::PushAudioFrame(AVFrame *f) {
+  if (!f) {
+    return -1;  // TODO: NULL to flush
+  }
+  if (swr_ctx_ == nullptr) { // use libswresample to convert for SDL playout
+    swr_ctx_ = swr_alloc_set_opts(
+        NULL, // we're allocating a new context
+        av_get_default_channel_layout(audio_spec_.channels), // out_ch_layout
+        AV_SAMPLE_FMT_S16,                                   // out_sample_fmt
+        audio_spec_.freq,                                    // out_sample_rate
+        f->channel_layout,                                   // in_ch_layout
+        (AVSampleFormat)f->format,                           // in_sample_fmt
+        f->sample_rate,                                      // in_sample_rate
+        0,                                                   // log_offset
+        NULL);                                               // log_ctx
+    swr_init(swr_ctx_);
+  }
+
+  uint8_t *output;
+  int out_samples =
+      av_rescale_rnd(swr_get_delay(swr_ctx_, f->sample_rate) + f->nb_samples,
+                     audio_spec_.freq, f->sample_rate, AV_ROUND_UP);
+  av_samples_alloc(&output, NULL, audio_spec_.channels, out_samples, AV_SAMPLE_FMT_S16, 0);
+
+  out_samples = swr_convert(swr_ctx_, &output, out_samples,
+                            (const uint8_t **)f->data, f->nb_samples);
+
+  auto size = av_samples_get_buffer_size(NULL, audio_spec_.channels, out_samples,
+                                        AV_SAMPLE_FMT_S16, 0);  
+   
+  auto ret = PushAudioData(output, size);
+
+  av_freep(&output);
+  return ret;
+}
+
 
 int Player::PopAudioData(unsigned char *data, int len) {
   if (!opened) {
@@ -49,6 +88,10 @@ int Player::PushAudioData(unsigned char *data, int len) {
 }
 
 int Player::Close() {
+  if (!opened) {
+    return 0;
+  }
+
   opened = false;
 
   SDL_CloseAudio();
@@ -71,6 +114,11 @@ int Player::Close() {
     audio_buffer_->Clear();
   }
 
+  if (swr_ctx_) {
+    swr_free(&swr_ctx_);
+  }
+
+
 #if defined(SAVE_PLAYBACK_AUDIO)
   fflush(audio_file);
   fclose(audio_file);
@@ -79,17 +127,28 @@ int Player::Close() {
   return 0;
 }
 
-int Player::Open() {
+int Player::Open(const AVCodecContext *v_dec_ctx,
+                 const AVCodecContext *a_dec_ctx) {
   if (opened) {
     return 0;
   }
 
   Uint32 sdl_flags = SDL_INIT_TIMER;
   if (enable_video_) {
+    assert(v_dec_ctx);
     sdl_flags |= SDL_INIT_VIDEO;
   }
   if (enable_audio_) {
+    assert(a_dec_ctx);
     sdl_flags |= SDL_INIT_AUDIO;
+#if defined(_WIN32)
+    // the SDL_AUDIODRIVER is mandantory on windows, otherwise no voice can be hear
+    const char *kSDLAudioDriverName = "SDL_AUDIODRIVER";
+    const char *kSDLAudioDriverValue = "directsound";
+    SDL_setenv(kSDLAudioDriverName, kSDLAudioDriverValue, 0);
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "set env for SDL: %s=%s\n",
+                 kSDLAudioDriverName, kSDLAudioDriverValue);
+#endif
   }
   auto ret = SDL_Init(sdl_flags);
   if (ret < 0) {
@@ -129,22 +188,33 @@ int Player::Open() {
   }
 
   if (enable_audio_) {
-    SDL_AudioSpec wanted_spec, spec;
-    wanted_spec.freq = 48000;          // TODO: get from codec
-    wanted_spec.format = AUDIO_S16SYS; // TODO: get from codec
-    wanted_spec.channels = 2;          // TODO: get from codec
+    SDL_AudioSpec wanted_spec;
+    wanted_spec.freq = a_dec_ctx->sample_rate;        
+    wanted_spec.format = AUDIO_S16SYS; 
+    wanted_spec.channels = 2; // a_dec_ctx->channels; // failed with 6(5.1) on windows with directsound, use 2 as default by simple
     wanted_spec.silence = 0;
-    wanted_spec.samples = 2048;
+    wanted_spec.samples = 1024; 
     wanted_spec.callback = sdl_audio_callback;
     wanted_spec.userdata = this;
-
-    ret = SDL_OpenAudio(&wanted_spec, &spec);
-    if (ret < 0) {
+    auto device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec_,
+                              SDL_AUDIO_ALLOW_ANY_CHANGE);
+    if (device_id <= 0) {
       SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_OpenAudio failed, err %s",
                    SDL_GetError());
       return -1;
     }
-    SDL_PauseAudio(0);
+    if (audio_spec_.format != AUDIO_S16SYS) {
+      av_log(NULL, AV_LOG_ERROR,
+             "SDL advised audio format %d is not supported!\n", audio_spec_.format);
+      return -1;
+    }
+    SDL_LogInfo(
+        SDL_LOG_CATEGORY_APPLICATION,
+        "SDL_OpenAudio want (%d channels, %d Hz), got (%d channels, %d Hz)\n",
+        wanted_spec.channels, wanted_spec.freq, audio_spec_.channels,
+        audio_spec_.freq);
+
+    SDL_PauseAudioDevice(device_id, 0);
   }
 
 #if defined(SAVE_PLAYBACK_AUDIO)
