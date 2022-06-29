@@ -9,7 +9,7 @@
 #include <deque>
 #include <mutex>
 
-// #define SAVE_PLAYBACK_AUDIO
+//#define SAVE_PLAYBACK_AUDIO
 
 class Player {
 public:
@@ -36,15 +36,21 @@ private:
   SDL_Renderer *renderer_{nullptr};
   SDL_Texture *texture_{nullptr};
 
+
+  /*** audio ***/ 
   std::unique_ptr<RingBuffer> audio_buffer_;
   std::mutex audio_buffer_mutex_;
   std::condition_variable audio_buffer_cv_;
   const int kAudioBufferSizeInBytes = 1024000; // 1MB
   std::atomic_bool audio_flushed_{false};
 
+  uint8_t *audio_resample_buffer_ {nullptr};
+  const int kMaxSamplesPerResample{1024 * 100}; // max 1024*100 per resample
+
   SDL_AudioSpec audio_spec_;
   SwrContext *swr_ctx_{nullptr};
   int audio_device_id_{0};
+  /*** audio ***/
 
 private:
   const bool enable_video_{false};

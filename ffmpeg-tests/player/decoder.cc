@@ -62,6 +62,7 @@ int Decoder::Open() {
     return AVERROR(ENOMEM);
   }
 
+  bool audio_stream_found = false, video_stream_found = false;
   for (auto i = 0; i < nb_streams_; ++i) {
     auto stream = ifmt_ctx_->streams[i];
     assert(stream);
@@ -69,6 +70,16 @@ int Decoder::Open() {
     if (stream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
         stream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
       av_log(NULL, AV_LOG_WARNING, "ignore non A/V stream %d, type (%d)%s\n", i,
+             stream->codecpar->codec_type,
+             av_get_media_type_string(stream->codecpar->codec_type));
+      continue;
+    }
+    if ((stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
+         video_stream_found) ||
+        (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO &&
+         audio_stream_found)) { // only pick up one stream per video/audio
+      av_log(NULL, AV_LOG_WARNING,
+             "ignore duplicate A/V stream %d, type (%d)%s\n", i,
              stream->codecpar->codec_type,
              av_get_media_type_string(stream->codecpar->codec_type));
       continue;
@@ -119,6 +130,7 @@ int Decoder::Open() {
     assert(dec_ctx_[i].frame);
 
     if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+      video_stream_found = true;
       av_log(NULL, AV_LOG_INFO,
              "<decoding> stream time_base %d/%d, codec time base %d/%d, pkt "
              "time base %d/%d\n",
@@ -127,6 +139,8 @@ int Decoder::Open() {
              dec_ctx_[i].codec_ctx->time_base.den,
              dec_ctx_[i].codec_ctx->pkt_timebase.num,
              dec_ctx_[i].codec_ctx->pkt_timebase.den);
+    } else if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
+      audio_stream_found = true;
     }
   }
   pkt_ = av_packet_alloc();
@@ -324,6 +338,10 @@ const AVCodecContext *Decoder::CodecContext(AVMediaType media_type) const {
   }
 
   for (int i = 0; i < nb_streams_; ++i) {
+    if (!dec_ctx_[i].codec_ctx) {
+      continue;
+    }
+
     if (dec_ctx_[i].codec_ctx->codec_type == media_type) {
       return dec_ctx_[i].codec_ctx;
     }

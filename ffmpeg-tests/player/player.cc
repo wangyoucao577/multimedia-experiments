@@ -12,10 +12,12 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
   if (n != len) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                  "audio playback requires %d bytes but only got %d", len, n);
-  }
+  } 
 
 #if defined(SAVE_PLAYBACK_AUDIO)
-  fwrite(stream, len, 1, player->audio_file);
+  if (n > 0) {
+    fwrite(stream, n, 1, player->audio_file);
+  }
 #endif
 }
 
@@ -43,23 +45,28 @@ int Player::PushAudioFrame(AVFrame *f) {
         NULL);                                               // log_ctx
     swr_init(swr_ctx_);
   }
+  if (!audio_resample_buffer_) {    // lazy alloc resample buffer
+     auto ret =
+        av_samples_alloc(&audio_resample_buffer_, NULL, audio_spec_.channels,
+                         kMaxSamplesPerResample, AV_SAMPLE_FMT_S16, 0);
+    assert(ret >= 0);
+  }
 
-  uint8_t *output;
-  int out_samples =
+  // resample
+  auto out_samples =
       av_rescale_rnd(swr_get_delay(swr_ctx_, f->sample_rate) + f->nb_samples,
                      audio_spec_.freq, f->sample_rate, AV_ROUND_UP);
-  av_samples_alloc(&output, NULL, audio_spec_.channels, out_samples, AV_SAMPLE_FMT_S16, 0);
-
-  out_samples = swr_convert(swr_ctx_, &output, out_samples,
+  out_samples = swr_convert(swr_ctx_, &audio_resample_buffer_, out_samples,
                             (const uint8_t **)f->data, f->nb_samples);
+  if (out_samples <= 0) {
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "swr_convert return err %d\n", out_samples);
+  }
 
   auto size = av_samples_get_buffer_size(NULL, audio_spec_.channels, out_samples,
                                         AV_SAMPLE_FMT_S16, 0);  
    
-  auto ret = PushAudioData(output, size);
-
-  av_freep(&output);
-  return ret;
+  return PushAudioData(audio_resample_buffer_, size);
 }
 
 
@@ -77,9 +84,10 @@ int Player::PushAudioData(unsigned char *data, int len) {
 
   int pushed_n = 0;
   while (opened_) {
-    auto n = audio_buffer_->Write(data, len);
+    auto n = audio_buffer_->Write(data + pushed_n, len - pushed_n);
     pushed_n += n;
-    if (pushed_n == len) { // until all data has been write
+    if (pushed_n >= len) { // until all data has been write
+      assert(pushed_n == len);
       break;
     }
 
@@ -136,6 +144,10 @@ int Player::Close() {
   if (swr_ctx_) {
     swr_free(&swr_ctx_);
   }
+  if (audio_resample_buffer_) {
+    av_freep(audio_resample_buffer_);
+    audio_resample_buffer_ = nullptr;
+  }
 
 
 #if defined(SAVE_PLAYBACK_AUDIO)
@@ -162,6 +174,7 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     sdl_flags |= SDL_INIT_AUDIO;
 #if defined(_WIN32)
     // the SDL_AUDIODRIVER is mandantory on windows, otherwise no voice can be hear
+    // https://wiki.libsdl.org/FAQUsingSDL
     const char *kSDLAudioDriverName = "SDL_AUDIODRIVER";
     const char *kSDLAudioDriverValue = "directsound";
     SDL_setenv(kSDLAudioDriverName, kSDLAudioDriverValue, 0);
@@ -237,7 +250,7 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
   }
 
 #if defined(SAVE_PLAYBACK_AUDIO)
-  audio_file = fopen("test_player.pcm", "w+");
+  audio_file = fopen("test_player.pcm", "wb+");
 #endif
 
   opened_ = true;
