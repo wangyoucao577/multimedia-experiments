@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   }
   const char *input_url = argv[1];
 
-  auto player = std::make_unique<Player>(false, true);
+  auto player = std::make_unique<Player>(true, false);
 
   int64_t total_decoded_video = 0, total_decoded_audio = 0;
   auto data_func = [&total_decoded_video, &total_decoded_audio,
@@ -43,9 +43,10 @@ int main(int argc, char *argv[]) {
                0, 0
 #endif
         );
-
         ++total_decoded_video;
       }
+      player->PushVideoFrame(f);
+
     } else if (media_type == AVMEDIA_TYPE_AUDIO) {
       if (!f->buf[0]) {
         av_log(

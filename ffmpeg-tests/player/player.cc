@@ -2,6 +2,23 @@
 #include "player.h"
 #include <cassert>
 
+Uint32 sdl_refresh_timer_callback(Uint32 interval, void *param) {
+  auto player = (Player *)param;
+  if (!player->Opened()) {
+    return interval;
+  }
+
+  SDL_UserEvent userevent{};
+  userevent.type = player->sdl_refresh_event;
+
+  SDL_Event event;
+  event.type = SDL_USEREVENT;
+  event.user = userevent;
+
+  SDL_PushEvent(&event);
+  return interval;
+}
+
 void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
   auto player = (Player *)userdata;
   if (!player->Opened()) {
@@ -23,7 +40,7 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 
 
 int Player::PushAudioFrame(AVFrame *f) {
-  if (!opened_ || audio_flushed_) {   // don't allow push data again if flushed
+  if (!opened_ || !enable_audio_ || audio_flushed_) { // don't allow push data again if flushed
     return 0;
   }
 
@@ -98,12 +115,64 @@ int Player::PushAudioData(unsigned char *data, int len) {
   return pushed_n;
 }
 
+
+int Player::PushVideoFrame(AVFrame *f) {
+  if (!opened_ || !enable_video_ || video_flushed_) { // don't allow push data again if flushed
+    return 0;
+  }
+
+  if (!f || !f->data[0]) { // empty frame, no more data will be pushed
+    video_flushed_.store(true);
+    return 0;
+  }
+
+  while (true) {
+    if (!opened_) {
+      return 0;
+    }
+
+    std::unique_lock<std::mutex> l(video_frames_mutex_);
+    if (video_frames_.size() >= kMaxCacheFrames) {
+      video_frames_cv_.wait(l);
+      continue;
+    }
+
+    auto new_f = av_frame_clone(f);
+    video_frames_.push_back(new_f);
+    break;
+  }
+
+  return 0;
+}
+
+AVFrame *Player::PopVideoFrame() {
+  std::lock_guard<std::mutex> _(video_frames_mutex_);
+  if (video_frames_.empty()) {
+    return nullptr;
+  }
+
+  auto f = video_frames_.front();
+  video_frames_.pop_front();
+  video_frames_cv_.notify_all();
+  return f;
+}
+
+void Player::ClearVideoFrames() {
+  std::lock_guard<std::mutex> _(video_frames_mutex_);
+  while (!video_frames_.empty()) {
+    auto f = video_frames_.front();
+    video_frames_.pop_front();
+    av_frame_free(&f);
+  }
+  video_frames_cv_.notify_all();
+}
+
 int Player::Close() {
   if (!opened_) {
     return 0;
   }
 
-  // wait until all data consumed if flushed
+  // wait until all audio data consumed if flushed
   if (audio_flushed_) {
     while (true) {
       using namespace std::chrono_literals;
@@ -115,13 +184,35 @@ int Player::Close() {
     }
   }
 
+  // wait until all video data consumed if flushed
+  if (video_flushed_) {
+    while (true) {
+      using namespace std::chrono_literals;
+      std::unique_lock<std::mutex> l(video_frames_mutex_);
+      if (video_frames_cv_.wait_for(l, 10ms,
+                                    [this] { return video_frames_.empty(); })) {
+        break; // if video buffer is empty
+      }
+    }
+  } else {  // otherwise clear directly
+    ClearVideoFrames();
+  }
+
   opened_.store(false);
 
   if (audio_device_id_ > 0) {
     SDL_CloseAudioDevice(audio_device_id_);
     audio_device_id_ = 0;
   }
-  audio_flushed_.store(false);
+
+  if (t_.joinable()) {
+    t_.join();
+  }
+
+  if (refresh_timer_id_) {
+    SDL_RemoveTimer(refresh_timer_id_);
+    refresh_timer_id_ = 0;
+  }
 
   if (texture_) {
     SDL_DestroyTexture(texture_);
@@ -136,6 +227,9 @@ int Player::Close() {
     window_ = nullptr;
   }
   SDL_Quit();
+
+  audio_flushed_.store(false);
+  video_flushed_.store(false);
 
   if (audio_buffer_) {
     audio_buffer_->Clear();
@@ -191,8 +285,8 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
 
   if (enable_video_) { // video window/renderer/texture
     window_ = SDL_CreateWindow("player", SDL_WINDOWPOS_UNDEFINED,
-                               SDL_WINDOWPOS_UNDEFINED, 1920,
-                               1080, // TODO: get from codec
+                               SDL_WINDOWPOS_UNDEFINED, v_dec_ctx->width,
+                               v_dec_ctx->height,
                                //   SDL_WINDOW_FULLSCREEN |
                                SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window_) {
@@ -210,11 +304,26 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
 
     // Allocate a place to put our YUV image on that screen
     texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_IYUV,
-                                 SDL_TEXTUREACCESS_STREAMING, 1920,
-                                 1080); // TODO: get from codec
+                                 SDL_TEXTUREACCESS_STREAMING, v_dec_ctx->width,
+                                 v_dec_ctx->height);
     if (!texture_) {
       SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                    "SDL_CreateTexture failed, err %s", SDL_GetError());
+      return -1;
+    }
+
+    // start event handler thread
+    t_ = std::thread(&Player::sdlEventProc, this);
+
+    // add timer to trigger refresh events
+    assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
+    auto refresh_interval_ms =
+        1000 * v_dec_ctx->framerate.den / v_dec_ctx->framerate.num;
+    refresh_timer_id_ = SDL_AddTimer(refresh_interval_ms,
+                                  sdl_refresh_timer_callback, this);
+    if (!refresh_timer_id_) {
+      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                   "SDL_AddTimer failed, err %s", SDL_GetError());
       return -1;
     }
   }
@@ -255,4 +364,50 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
 
   opened_ = true;
   return 0;
+}
+
+
+void Player::sdlEventProc() {
+
+  while (true) {
+    if (!opened_) {
+      break;
+    }
+
+    SDL_Event event;
+    auto ret = SDL_PollEvent(&event);
+    if (ret <= 0) {
+      continue;
+    }
+
+    switch (event.type) {
+    case SDL_USEREVENT:
+      if (event.user.type == sdl_refresh_event) { // refresh
+        auto frame = PopVideoFrame();
+        if (!frame) {
+          SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                      "video refresh but no frame available");
+          continue;
+        }
+
+        refreshDisplay(frame);
+        av_frame_free(&frame); 
+      }
+    default:    // TODO: process other events
+      break;
+    }
+  }
+}
+
+void Player::refreshDisplay(AVFrame *f) { 
+  if (!opened_) {
+    return;
+  }
+  assert(f);
+
+  SDL_UpdateYUVTexture(texture_, NULL, f->data[0], f->linesize[0],
+                       f->data[1], f->linesize[1], f->data[2],
+                       f->linesize[2]);
+  SDL_RenderCopy(renderer_, texture_, NULL, NULL);
+  SDL_RenderPresent(renderer_);
 }

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <deque>
 #include <mutex>
+#include <thread>
 
 //#define SAVE_PLAYBACK_AUDIO
 
@@ -31,11 +32,31 @@ public:
   int PushAudioData(unsigned char *data, int len);
   int PopAudioData(unsigned char *data, int len);
 
+  int PushVideoFrame(AVFrame *f);
+  AVFrame* PopVideoFrame();
+  void ClearVideoFrames();
+
 private:
+
+  /*** video ***/ 
   SDL_Window *window_{nullptr};
   SDL_Renderer *renderer_{nullptr};
   SDL_Texture *texture_{nullptr};
 
+  std::deque<AVFrame *> video_frames_;
+  mutable std::mutex video_frames_mutex_;
+  std::condition_variable video_frames_cv_;
+  const int kMaxCacheFrames{50};
+
+  std::atomic_bool video_flushed_{false};
+
+  SDL_TimerID refresh_timer_id_{0}; // timer to trigger refresh event
+
+  std::thread t_;   // thread to respond SDL events, mandantory for video
+
+  void sdlEventProc();
+  void refreshDisplay(AVFrame *f);
+  /*** video ***/ 
 
   /*** audio ***/ 
   std::unique_ptr<RingBuffer> audio_buffer_;
@@ -51,6 +72,10 @@ private:
   SwrContext *swr_ctx_{nullptr};
   int audio_device_id_{0};
   /*** audio ***/
+
+public:
+  const uint32_t sdl_refresh_event{
+      SDL_RegisterEvents(1)}; // register refresh event
 
 private:
   const bool enable_video_{false};
