@@ -198,6 +198,7 @@ int Player::Close() {
     ClearVideoFrames();
   }
 
+  stop_.store(true);
   opened_.store(false);
 
   if (audio_device_id_ > 0) {
@@ -239,8 +240,7 @@ int Player::Close() {
     swr_free(&swr_ctx_);
   }
   if (audio_resample_buffer_) {
-    av_freep(audio_resample_buffer_);
-    audio_resample_buffer_ = nullptr;
+    av_freep(&audio_resample_buffer_);
   }
 
 
@@ -370,7 +370,7 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
 void Player::sdlEventProc() {
 
   while (true) {
-    if (!opened_) {
+    if (stop_) {
       break;
     }
 

@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   }
   const char *input_url = argv[1];
 
-  auto player = std::make_unique<Player>(true, false);
+  auto player = std::make_unique<Player>(true, true);
 
   int64_t total_decoded_video = 0, total_decoded_audio = 0;
   auto data_func = [&total_decoded_video, &total_decoded_audio,

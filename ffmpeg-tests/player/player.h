@@ -81,6 +81,7 @@ private:
   const bool enable_video_{false};
   const bool enable_audio_{false};
   std::atomic_bool opened_{false};
+  std::atomic_bool stop_{false};    // notify for stopping
 
 #if defined(SAVE_PLAYBACK_AUDIO)
 public:
