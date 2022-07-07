@@ -62,28 +62,30 @@ int Player::PushAudioFrame(AVFrame *f) {
         NULL);                                               // log_ctx
     swr_init(swr_ctx_);
   }
-  if (!audio_resample_buffer_) {    // lazy alloc resample buffer
-     auto ret =
-        av_samples_alloc(&audio_resample_buffer_, NULL, audio_spec_.channels,
-                         kMaxSamplesPerResample, AV_SAMPLE_FMT_S16, 0);
-    assert(ret >= 0);
-  }
 
-  // resample
+
+  AudioSamples audio_samples;
   auto out_samples =
       av_rescale_rnd(swr_get_delay(swr_ctx_, f->sample_rate) + f->nb_samples,
                      audio_spec_.freq, f->sample_rate, AV_ROUND_UP);
-  out_samples = swr_convert(swr_ctx_, &audio_resample_buffer_, out_samples,
+  auto ret = av_samples_alloc(&audio_samples.data, NULL, audio_spec_.channels,
+                              out_samples, AV_SAMPLE_FMT_S16, 0);
+  assert(ret >= 0);
+  audio_samples.len = av_samples_get_buffer_size(NULL, audio_spec_.channels,
+                                          out_samples,
+                             AV_SAMPLE_FMT_S16, 0);  
+
+
+  // resample
+  out_samples = swr_convert(swr_ctx_, &audio_samples.data, out_samples,
                             (const uint8_t **)f->data, f->nb_samples);
   if (out_samples <= 0) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "swr_convert return err %d\n", out_samples);
   }
 
-  auto size = av_samples_get_buffer_size(NULL, audio_spec_.channels, out_samples,
-                                        AV_SAMPLE_FMT_S16, 0);  
-   
-  return PushAudioData(audio_resample_buffer_, size);
+  audio_samples.pts = f->best_effort_timestamp;
+  return audio_queue_.Write(std::move(audio_samples));
 }
 
 
@@ -92,27 +94,9 @@ int Player::PopAudioData(unsigned char *data, int len) {
     return 0;
   }
 
-  auto n = audio_buffer_->Read(data, len);
-  audio_buffer_cv_.notify_all();
+  auto n = audio_queue_.Read(data, len);
+  audio_queue_cv_.notify_all();
   return n;
-}
-
-int Player::PushAudioData(unsigned char *data, int len) {
-
-  int pushed_n = 0;
-  while (opened_) {
-    auto n = audio_buffer_->Write(data + pushed_n, len - pushed_n);
-    pushed_n += n;
-    if (pushed_n >= len) { // until all data has been write
-      assert(pushed_n == len);
-      break;
-    }
-
-    std::unique_lock<std::mutex> l(audio_buffer_mutex_);
-    audio_buffer_cv_.wait(l);
-  }
-
-  return pushed_n;
 }
 
 
@@ -176,9 +160,9 @@ int Player::Close() {
   if (audio_flushed_) {
     while (true) {
       using namespace std::chrono_literals;
-      std::unique_lock<std::mutex> l(audio_buffer_mutex_);
-      if (audio_buffer_cv_.wait_for(
-              l, 10ms, [this] { return audio_buffer_->Size() == 0; })) {
+      std::unique_lock<std::mutex> l(audio_queue_mutex_);
+      if (audio_queue_cv_.wait_for(
+              l, 10ms, [this] { return audio_queue_.Empty(); })) {
         break;   // if audio buffer is empty
       }
     }
@@ -232,17 +216,9 @@ int Player::Close() {
   audio_flushed_.store(false);
   video_flushed_.store(false);
 
-  if (audio_buffer_) {
-    audio_buffer_->Clear();
-  }
-
   if (swr_ctx_) {
     swr_free(&swr_ctx_);
   }
-  if (audio_resample_buffer_) {
-    av_freep(&audio_resample_buffer_);
-  }
-
 
 #if defined(SAVE_PLAYBACK_AUDIO)
   fflush(audio_file);

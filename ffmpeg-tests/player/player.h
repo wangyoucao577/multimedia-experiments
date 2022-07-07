@@ -1,10 +1,11 @@
 
 #pragma once
 
-#include "SDL.h"
 #include "libav_headers.h"
 #include "ring_buffer.h"
+#include "audio_queue.h"
 
+#include "SDL.h"
 #include <atomic>
 #include <deque>
 #include <mutex>
@@ -19,7 +20,6 @@ public:
   Player(Player &&) = delete;
   Player(bool enable_video, bool enable_audio)
       : enable_video_(enable_video), enable_audio_(enable_audio) {
-    audio_buffer_ = std::make_unique<RingBuffer>(kAudioBufferSizeInBytes);
   }
   ~Player() = default;
 
@@ -29,7 +29,6 @@ public:
   bool Opened() const { return opened_; }
 
   int PushAudioFrame(AVFrame *f);
-  int PushAudioData(unsigned char *data, int len);
   int PopAudioData(unsigned char *data, int len);
 
   int PushVideoFrame(AVFrame *f);
@@ -59,14 +58,10 @@ private:
   /*** video ***/ 
 
   /*** audio ***/ 
-  std::unique_ptr<RingBuffer> audio_buffer_;
-  std::mutex audio_buffer_mutex_;
-  std::condition_variable audio_buffer_cv_;
-  const int kAudioBufferSizeInBytes = 1024000; // 1MB
+  AudioSamplesQueue audio_queue_;
+  std::mutex audio_queue_mutex_;
+  std::condition_variable audio_queue_cv_;
   std::atomic_bool audio_flushed_{false};
-
-  uint8_t *audio_resample_buffer_ {nullptr};
-  const int kMaxSamplesPerResample{1024 * 100}; // max 1024*100 per resample
 
   SDL_AudioSpec audio_spec_;
   SwrContext *swr_ctx_{nullptr};
