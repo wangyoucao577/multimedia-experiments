@@ -2,7 +2,6 @@
 #pragma once
 
 #include "libav_headers.h"
-#include "ring_buffer.h"
 #include "audio_queue.h"
 
 #include "SDL.h"
