@@ -131,17 +131,17 @@ int Decoder::Open() {
 
     if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
       video_stream_found = true;
-      av_log(NULL, AV_LOG_INFO,
-             "<decoding> stream time_base %d/%d, codec time base %d/%d, pkt "
-             "time base %d/%d\n",
-             stream->time_base.num, stream->time_base.den,
-             dec_ctx_[i].codec_ctx->time_base.num,
-             dec_ctx_[i].codec_ctx->time_base.den,
-             dec_ctx_[i].codec_ctx->pkt_timebase.num,
-             dec_ctx_[i].codec_ctx->pkt_timebase.den);
     } else if (dec_ctx_[i].codec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
       audio_stream_found = true;
     }
+    av_log(NULL, AV_LOG_INFO,
+           "<decoding> stream time_base %d/%d, codec time base %d/%d, pkt "
+           "time base %d/%d\n",
+           stream->time_base.num, stream->time_base.den,
+           dec_ctx_[i].codec_ctx->time_base.num,
+           dec_ctx_[i].codec_ctx->time_base.den,
+           dec_ctx_[i].codec_ctx->pkt_timebase.num,
+           dec_ctx_[i].codec_ctx->pkt_timebase.den);
   }
   pkt_ = av_packet_alloc();
   assert(pkt_);
@@ -185,19 +185,20 @@ int Decoder::run() {
     }
 
     av_packet_rescale_ts(pkt_, ifmt_ctx_->streams[i]->time_base,
-                         kFundamentalTimeBase); // convert to unified timebase
+                         dec_ctx_[i].codec_ctx->time_base); // convert to codec timebase
 
     av_log(NULL, AV_LOG_VERBOSE,
-           "<decoding> stream %d type %s read packet pts %" PRId64
-           ", dts %" PRId64 ", duration %" PRId64 ", time_base %d/%d\n",
-           i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
-           pkt_->pts, pkt_->dts, pkt_->duration,
+            "<decoding> stream %d type %s read packet pts %" PRId64
+            ", dts %" PRId64 ", duration %" PRId64 ", time_base %d/%d\n",
+            i, av_get_media_type_string(dec_ctx_[i].codec_ctx->codec_type),
+            pkt_->pts, pkt_->dts, pkt_->duration,
 #if LIBAVCODEC_VERSION_MAJOR >= 59 && LIBAVCODEC_VERSION_MINOR >= 4
-           pkt_->time_base.num, pkt_->time_base.den
+            pkt_->time_base.num, pkt_->time_base.den
 #else
-           0, 0
+            0, 0
 #endif
     );
+
 
     ret = avcodec_send_packet(dec_ctx_[i].codec_ctx, pkt_);
     dec_ctx_[i].in_count++;
@@ -306,8 +307,11 @@ int Decoder::receive_frames(int stream_index) {
 
     // callback
     if (data_callback_) {
-      data_callback_(stream_index, dec_ctx.codec_ctx->codec_type,
-                     dec_ctx.frame);
+      AVFrameExtended f;
+      f.frame = dec_ctx.frame;
+      f.media_type = dec_ctx.codec_ctx->codec_type;
+      f.time_base = dec_ctx.codec_ctx->time_base;
+      data_callback_(stream_index, f);
     }
 
     av_frame_unref(dec_ctx.frame);

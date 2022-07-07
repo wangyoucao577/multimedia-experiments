@@ -8,8 +8,7 @@
 
 #include "libav_headers.h"
 
-using DataCallback = int(int stream_index, const AVMediaType media_type,
-                         AVFrame *f);
+using DataCallback = int(int stream_index, AVFrameExtended f);
 using ErrorCallback = int(int);
 
 class Decoder {
@@ -19,7 +18,7 @@ public:
   Decoder(Decoder &&) = delete;
   Decoder(const std::string &input_file,
           std::function<DataCallback> data_callback)
-      : input_file_(input_file), data_callback_(std::move(data_callback)) {}
+      : data_callback_(std::move(data_callback)), input_file_(input_file) {}
   ~Decoder() = default;
 
 public:

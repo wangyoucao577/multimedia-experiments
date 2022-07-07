@@ -39,12 +39,12 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 }
 
 
-int Player::PushAudioFrame(AVFrame *f) {
+int Player::PushAudioFrame(AVFrameExtended f) {
   if (!opened_ || !enable_audio_ || audio_flushed_) { // don't allow push data again if flushed
     return 0;
   }
 
-  if (!f || !f->data[0]) { // empty frame, no more data will be pushed
+  if (!f.frame || !f.frame->data[0]) { // empty frame, no more data will be pushed
     audio_flushed_.store(true);
     return 0;
   }
@@ -55,9 +55,9 @@ int Player::PushAudioFrame(AVFrame *f) {
         av_get_default_channel_layout(audio_spec_.channels), // out_ch_layout
         AV_SAMPLE_FMT_S16,                                   // out_sample_fmt
         audio_spec_.freq,                                    // out_sample_rate
-        f->channel_layout,                                   // in_ch_layout
-        (AVSampleFormat)f->format,                           // in_sample_fmt
-        f->sample_rate,                                      // in_sample_rate
+        f.frame->channel_layout,                                   // in_ch_layout
+        (AVSampleFormat)f.frame->format,                           // in_sample_fmt
+        f.frame->sample_rate,                                      // in_sample_rate
         0,                                                   // log_offset
         NULL);                                               // log_ctx
     swr_init(swr_ctx_);
@@ -66,8 +66,8 @@ int Player::PushAudioFrame(AVFrame *f) {
 
   AudioSamples audio_samples;
   auto out_samples =
-      av_rescale_rnd(swr_get_delay(swr_ctx_, f->sample_rate) + f->nb_samples,
-                     audio_spec_.freq, f->sample_rate, AV_ROUND_UP);
+      av_rescale_rnd(swr_get_delay(swr_ctx_, f.frame->sample_rate) + f.frame->nb_samples,
+                     audio_spec_.freq, f.frame->sample_rate, AV_ROUND_UP);
   auto ret = av_samples_alloc(&audio_samples.data, NULL, audio_spec_.channels,
                               out_samples, AV_SAMPLE_FMT_S16, 0);
   assert(ret >= 0);
@@ -78,13 +78,14 @@ int Player::PushAudioFrame(AVFrame *f) {
 
   // resample
   out_samples = swr_convert(swr_ctx_, &audio_samples.data, out_samples,
-                            (const uint8_t **)f->data, f->nb_samples);
+                            (const uint8_t **)f.frame->data, f.frame->nb_samples);
   if (out_samples <= 0) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "swr_convert return err %d\n", out_samples);
   }
 
-  audio_samples.pts = f->best_effort_timestamp;
+  audio_samples.pts = f.frame->best_effort_timestamp;
+  audio_samples.time_base = f.time_base;
   return audio_queue_.Write(std::move(audio_samples));
 }
 
@@ -100,12 +101,12 @@ int Player::PopAudioData(unsigned char *data, int len) {
 }
 
 
-int Player::PushVideoFrame(AVFrame *f) {
+int Player::PushVideoFrame(AVFrameExtended f) {
   if (!opened_ || !enable_video_ || video_flushed_) { // don't allow push data again if flushed
     return 0;
   }
 
-  if (!f || !f->data[0]) { // empty frame, no more data will be pushed
+  if (!f.frame || !f.frame->data[0]) { // empty frame, no more data will be pushed
     video_flushed_.store(true);
     return 0;
   }
@@ -121,18 +122,19 @@ int Player::PushVideoFrame(AVFrame *f) {
       continue;
     }
 
-    auto new_f = av_frame_clone(f);
-    video_frames_.push_back(new_f);
+    auto new_frame = av_frame_clone(f.frame);
+    f.frame = new_frame;
+    video_frames_.emplace_back(std::move(f));
     break;
   }
 
   return 0;
 }
 
-AVFrame *Player::PopVideoFrame() {
+AVFrameExtended Player::PopVideoFrame() {
   std::lock_guard<std::mutex> _(video_frames_mutex_);
   if (video_frames_.empty()) {
-    return nullptr;
+    return AVFrameExtended{0};
   }
 
   auto f = video_frames_.front();
@@ -146,7 +148,7 @@ void Player::ClearVideoFrames() {
   while (!video_frames_.empty()) {
     auto f = video_frames_.front();
     video_frames_.pop_front();
-    av_frame_free(&f);
+    av_frame_free(&f.frame);
   }
   video_frames_cv_.notify_all();
 }
@@ -359,15 +361,15 @@ void Player::sdlEventProc() {
     switch (event.type) {
     case SDL_USEREVENT:
       if (event.user.type == sdl_refresh_event) { // refresh
-        auto frame = PopVideoFrame();
-        if (!frame) {
+        auto f = PopVideoFrame();
+        if (!f.frame) {
           SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                       "video refresh but no frame available");
           continue;
         }
 
-        refreshDisplay(frame);
-        av_frame_free(&frame); 
+        refreshDisplay(f.frame);
+        av_frame_free(&f.frame); 
       }
     default:    // TODO: process other events
       break;

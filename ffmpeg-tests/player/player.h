@@ -27,11 +27,11 @@ public:
   int Close();
   bool Opened() const { return opened_; }
 
-  int PushAudioFrame(AVFrame *f);
+  int PushAudioFrame(AVFrameExtended f);
   int PopAudioData(unsigned char *data, int len);
 
-  int PushVideoFrame(AVFrame *f);
-  AVFrame* PopVideoFrame();
+  int PushVideoFrame(AVFrameExtended f);
+  AVFrameExtended PopVideoFrame();
   void ClearVideoFrames();
 
 private:
@@ -41,7 +41,7 @@ private:
   SDL_Renderer *renderer_{nullptr};
   SDL_Texture *texture_{nullptr};
 
-  std::deque<AVFrame *> video_frames_;
+  std::deque<AVFrameExtended> video_frames_;
   mutable std::mutex video_frames_mutex_;
   std::condition_variable video_frames_cv_;
   const int kMaxCacheFrames{50};

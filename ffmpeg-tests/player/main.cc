@@ -20,25 +20,24 @@ int main(int argc, char *argv[]) {
 
   int64_t total_decoded_video = 0, total_decoded_audio = 0;
   auto data_func = [&total_decoded_video, &total_decoded_audio,
-                    &player](int stream_index, const AVMediaType media_type,
-                             AVFrame *f) -> int {
-    assert(f);
-    if (media_type == AVMEDIA_TYPE_VIDEO) {
-      if (!f->buf[0]) {
+                    &player](int stream_index, AVFrameExtended f) -> int {
+    assert(f.frame);
+    if (f.media_type == AVMEDIA_TYPE_VIDEO) {
+      if (!f.frame->buf[0]) {
         av_log(
             NULL, AV_LOG_INFO,
             "decoded callback stream %d media_type %s result blank frame for "
             "flushing\n",
-            stream_index, av_get_media_type_string(media_type));
+            stream_index, av_get_media_type_string(f.media_type));
       } else {
         av_log(NULL, AV_LOG_VERBOSE,
                "decoded callback stream %d frame pict_type %c, pts %" PRId64
                ", pkt_dts %" PRId64 ", pkt_duration %" PRId64
                ", best_effort_timestamp %" PRId64 ", time_base %d/%d\n",
-               stream_index, av_get_picture_type_char(f->pict_type), f->pts,
-               f->pkt_dts, f->pkt_duration, f->best_effort_timestamp,
+               stream_index, av_get_picture_type_char(f.frame->pict_type), f.frame->pts,
+               f.frame->pkt_dts, f.frame->pkt_duration, f.frame->best_effort_timestamp,
 #if LIBAVUTIL_VERSION_MAJOR >= 57 && LIBAVUTIL_VERSION_MINOR >= 10
-               f->time_base.num, f->time_base.den
+               f.frame->time_base.num, f.frame->time_base.den
 #else
                0, 0
 #endif
@@ -47,18 +46,18 @@ int main(int argc, char *argv[]) {
       }
       player->PushVideoFrame(f);
 
-    } else if (media_type == AVMEDIA_TYPE_AUDIO) {
-      if (!f->buf[0]) {
+    } else if (f.media_type == AVMEDIA_TYPE_AUDIO) {
+      if (!f.frame->buf[0]) {
         av_log(
             NULL, AV_LOG_INFO,
             "decoded callback stream %d media_type %s result blank frame for "
             "flushing\n",
-            stream_index, av_get_media_type_string(media_type));
+            stream_index, av_get_media_type_string(f.media_type));
       } else {
         av_log(NULL, AV_LOG_VERBOSE,
                "decoded callback stream %d frame samples %d\n", stream_index,
-               f->nb_samples);
-        total_decoded_audio += f->nb_samples;
+               f.frame->nb_samples);
+        total_decoded_audio += f.frame->nb_samples;
       }
       player->PushAudioFrame(f);
     }
