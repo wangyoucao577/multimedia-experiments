@@ -23,6 +23,7 @@ struct AudioSamples {
     read_offset = other.read_offset;
     pts = other.pts;
     time_base = other.time_base;
+    samples = other.samples;
   }
 
   int Read(unsigned char *buf, int len) {
@@ -42,6 +43,7 @@ struct AudioSamples {
 
   int64_t pts{0};       // start pts of current samples
   AVRational time_base{0};
+  int64_t samples{0};   // how many samples
 };
 
 class AudioSamplesQueue {
@@ -57,6 +59,10 @@ public:
 
   bool Empty() const;
   std::pair<int64_t, AVRational> front_pts() const;
+  std::pair<int64_t, AVRational> audio_clock() const;
+
+private:
+  void sync_audio_unsafe(const AudioSamples &audio_samples); // calculate audio clock
 
 private:
   std::deque<AudioSamples> queue_;
@@ -64,4 +70,5 @@ private:
 
   int64_t front_pts_{0};
   AVRational time_base_{0};
+  int64_t audio_clock_{0};  // calculated, use same time_base_
 };

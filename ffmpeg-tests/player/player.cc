@@ -30,7 +30,7 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "audio playback requires %d bytes but only got %d", len, n);
   }
-
+  
 #if defined(SAVE_PLAYBACK_AUDIO)
   if (n > 0) {
     fwrite(stream, n, 1, player->audio_file);
@@ -85,6 +85,7 @@ int Player::PushAudioFrame(AVFrameExtended f) {
 
   audio_samples.pts = f.frame->best_effort_timestamp;
   audio_samples.time_base = f.time_base;
+  audio_samples.samples = out_samples;
   return audio_queue_.Write(std::move(audio_samples));
 }
 
