@@ -46,6 +46,10 @@ private:
   std::condition_variable video_frames_cv_;
   const int kMaxCacheFrames{50};
 
+  std::pair<int64_t, AVRational> video_clock_{}; // calculated video clock in AVRational (time_base)
+  AVRational video_frame_rate_{};
+  void sync_video_unsafe(const AVFrameExtended &f); // calculate video clock
+
   std::atomic_bool video_flushed_{false};
 
   SDL_TimerID refresh_timer_id_{0}; // timer to trigger refresh event

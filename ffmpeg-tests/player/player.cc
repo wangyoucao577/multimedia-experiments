@@ -28,8 +28,8 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
   auto n = player->PopAudioData(stream, len);
   if (n != len) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                 "audio playback requires %d bytes but only got %d", len, n);
-  } 
+                "audio playback requires %d bytes but only got %d", len, n);
+  }
 
 #if defined(SAVE_PLAYBACK_AUDIO)
   if (n > 0) {
@@ -38,13 +38,14 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
 #endif
 }
 
-
 int Player::PushAudioFrame(AVFrameExtended f) {
-  if (!opened_ || !enable_audio_ || audio_flushed_) { // don't allow push data again if flushed
+  if (!opened_ || !enable_audio_ ||
+      audio_flushed_) { // don't allow push data again if flushed
     return 0;
   }
 
-  if (!f.frame || !f.frame->data[0]) { // empty frame, no more data will be pushed
+  if (!f.frame ||
+      !f.frame->data[0]) { // empty frame, no more data will be pushed
     audio_flushed_.store(true);
     return 0;
   }
@@ -55,40 +56,37 @@ int Player::PushAudioFrame(AVFrameExtended f) {
         av_get_default_channel_layout(audio_spec_.channels), // out_ch_layout
         AV_SAMPLE_FMT_S16,                                   // out_sample_fmt
         audio_spec_.freq,                                    // out_sample_rate
-        f.frame->channel_layout,                                   // in_ch_layout
-        (AVSampleFormat)f.frame->format,                           // in_sample_fmt
-        f.frame->sample_rate,                                      // in_sample_rate
+        f.frame->channel_layout,                             // in_ch_layout
+        (AVSampleFormat)f.frame->format,                     // in_sample_fmt
+        f.frame->sample_rate,                                // in_sample_rate
         0,                                                   // log_offset
         NULL);                                               // log_ctx
     swr_init(swr_ctx_);
   }
 
-
   AudioSamples audio_samples;
-  auto out_samples =
-      av_rescale_rnd(swr_get_delay(swr_ctx_, f.frame->sample_rate) + f.frame->nb_samples,
-                     audio_spec_.freq, f.frame->sample_rate, AV_ROUND_UP);
+  auto out_samples = av_rescale_rnd(
+      swr_get_delay(swr_ctx_, f.frame->sample_rate) + f.frame->nb_samples,
+      audio_spec_.freq, f.frame->sample_rate, AV_ROUND_UP);
   auto ret = av_samples_alloc(&audio_samples.data, NULL, audio_spec_.channels,
                               out_samples, AV_SAMPLE_FMT_S16, 0);
   assert(ret >= 0);
-  audio_samples.len = av_samples_get_buffer_size(NULL, audio_spec_.channels,
-                                          out_samples,
-                             AV_SAMPLE_FMT_S16, 0);  
-
+  audio_samples.len = av_samples_get_buffer_size(
+      NULL, audio_spec_.channels, out_samples, AV_SAMPLE_FMT_S16, 0);
 
   // resample
-  out_samples = swr_convert(swr_ctx_, &audio_samples.data, out_samples,
-                            (const uint8_t **)f.frame->data, f.frame->nb_samples);
+  out_samples =
+      swr_convert(swr_ctx_, &audio_samples.data, out_samples,
+                  (const uint8_t **)f.frame->data, f.frame->nb_samples);
   if (out_samples <= 0) {
-    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                "swr_convert return err %d\n", out_samples);
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "swr_convert return err %d\n",
+                out_samples);
   }
 
   audio_samples.pts = f.frame->best_effort_timestamp;
   audio_samples.time_base = f.time_base;
   return audio_queue_.Write(std::move(audio_samples));
 }
-
 
 int Player::PopAudioData(unsigned char *data, int len) {
   if (!opened_) {
@@ -100,13 +98,14 @@ int Player::PopAudioData(unsigned char *data, int len) {
   return n;
 }
 
-
 int Player::PushVideoFrame(AVFrameExtended f) {
-  if (!opened_ || !enable_video_ || video_flushed_) { // don't allow push data again if flushed
+  if (!opened_ || !enable_video_ ||
+      video_flushed_) { // don't allow push data again if flushed
     return 0;
   }
 
-  if (!f.frame || !f.frame->data[0]) { // empty frame, no more data will be pushed
+  if (!f.frame ||
+      !f.frame->data[0]) { // empty frame, no more data will be pushed
     video_flushed_.store(true);
     return 0;
   }
@@ -139,6 +138,10 @@ AVFrameExtended Player::PopVideoFrame() {
 
   auto f = video_frames_.front();
   video_frames_.pop_front();
+
+  // sync video: calculate current present video clock
+  sync_video_unsafe(f);
+
   video_frames_cv_.notify_all();
   return f;
 }
@@ -163,9 +166,9 @@ int Player::Close() {
     while (true) {
       using namespace std::chrono_literals;
       std::unique_lock<std::mutex> l(audio_queue_mutex_);
-      if (audio_queue_cv_.wait_for(
-              l, 10ms, [this] { return audio_queue_.Empty(); })) {
-        break;   // if audio buffer is empty
+      if (audio_queue_cv_.wait_for(l, 10ms,
+                                   [this] { return audio_queue_.Empty(); })) {
+        break; // if audio buffer is empty
       }
     }
   }
@@ -180,7 +183,7 @@ int Player::Close() {
         break; // if video buffer is empty
       }
     }
-  } else {  // otherwise clear directly
+  } else { // otherwise clear directly
     ClearVideoFrames();
   }
 
@@ -245,8 +248,8 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     assert(a_dec_ctx);
     sdl_flags |= SDL_INIT_AUDIO;
 #if defined(_WIN32)
-    // the SDL_AUDIODRIVER is mandantory on windows, otherwise no voice can be hear
-    // https://wiki.libsdl.org/FAQUsingSDL
+    // the SDL_AUDIODRIVER is mandantory on windows, otherwise no voice can be
+    // hear https://wiki.libsdl.org/FAQUsingSDL
     const char *kSDLAudioDriverName = "SDL_AUDIODRIVER";
     const char *kSDLAudioDriverValue = "directsound";
     SDL_setenv(kSDLAudioDriverName, kSDLAudioDriverValue, 0);
@@ -290,33 +293,38 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
       return -1;
     }
 
+    // initial frame rate of video_clock
+    assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
+    video_frame_rate_ = v_dec_ctx->framerate;
+
     // start event handler thread
     t_ = std::thread(&Player::sdlEventProc, this);
 
     // add timer to trigger refresh events
-    assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
     auto refresh_interval_ms =
         1000 * v_dec_ctx->framerate.den / v_dec_ctx->framerate.num;
-    refresh_timer_id_ = SDL_AddTimer(refresh_interval_ms,
-                                  sdl_refresh_timer_callback, this);
+    refresh_timer_id_ =
+        SDL_AddTimer(refresh_interval_ms, sdl_refresh_timer_callback, this);
     if (!refresh_timer_id_) {
-      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                   "SDL_AddTimer failed, err %s", SDL_GetError());
+      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_AddTimer failed, err %s",
+                   SDL_GetError());
       return -1;
     }
   }
 
   if (enable_audio_) {
     SDL_AudioSpec wanted_spec;
-    wanted_spec.freq = a_dec_ctx->sample_rate;        
-    wanted_spec.format = AUDIO_S16SYS; 
-    wanted_spec.channels = 2; // a_dec_ctx->channels; // failed with 6(5.1) on windows with directsound, use 2 as default by simple
+    wanted_spec.freq = a_dec_ctx->sample_rate;
+    wanted_spec.format = AUDIO_S16SYS;
+    wanted_spec.channels =
+        2; // a_dec_ctx->channels; // failed with 6(5.1) on windows with
+           // directsound, use 2 as default by simple
     wanted_spec.silence = 0;
-    wanted_spec.samples = 1024; 
+    wanted_spec.samples = 1024;
     wanted_spec.callback = sdl_audio_callback;
     wanted_spec.userdata = this;
     audio_device_id_ = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec_,
-                              SDL_AUDIO_ALLOW_ANY_CHANGE);
+                                           SDL_AUDIO_ALLOW_ANY_CHANGE);
     if (audio_device_id_ <= 0) {
       SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_OpenAudio failed, err %s",
                    SDL_GetError());
@@ -324,7 +332,8 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     }
     if (audio_spec_.format != AUDIO_S16SYS) {
       av_log(NULL, AV_LOG_ERROR,
-             "SDL advised audio format %d is not supported!\n", audio_spec_.format);
+             "SDL advised audio format %d is not supported!\n",
+             audio_spec_.format);
       return -1;
     }
     SDL_LogInfo(
@@ -343,7 +352,6 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
   opened_ = true;
   return 0;
 }
-
 
 void Player::sdlEventProc() {
 
@@ -369,23 +377,54 @@ void Player::sdlEventProc() {
         }
 
         refreshDisplay(f.frame);
-        av_frame_free(&f.frame); 
+        av_frame_free(&f.frame);
       }
-    default:    // TODO: process other events
+    default: // TODO: process other events
       break;
     }
   }
 }
 
-void Player::refreshDisplay(AVFrame *f) { 
+void Player::refreshDisplay(AVFrame *f) {
   if (!opened_) {
     return;
   }
   assert(f);
 
-  SDL_UpdateYUVTexture(texture_, NULL, f->data[0], f->linesize[0],
-                       f->data[1], f->linesize[1], f->data[2],
-                       f->linesize[2]);
+  SDL_UpdateYUVTexture(texture_, NULL, f->data[0], f->linesize[0], f->data[1],
+                       f->linesize[1], f->data[2], f->linesize[2]);
   SDL_RenderCopy(renderer_, texture_, NULL, NULL);
   SDL_RenderPresent(renderer_);
+}
+
+void Player::sync_video_unsafe(const AVFrameExtended &f) {
+
+  if (video_clock_.first == 0) {
+    video_clock_.first = f.frame->best_effort_timestamp;
+    video_clock_.second = f.time_base;
+    return;
+  }
+
+  assert(video_frame_rate_.den > 0 && video_frame_rate_.num > 0);
+  video_clock_.first = av_add_stable(video_clock_.second, video_clock_.first,
+                                     av_inv_q(video_frame_rate_), 1);
+
+  // SDL_LogDebug(
+  //    SDL_LOG_CATEGORY_APPLICATION,
+  //    "video clock %" PRId64 " time_base %d/%d, latest frame pts %" PRId64
+  //    ", time_base %d/%d\n",
+  //    video_clock_.first, video_clock_.second.num, video_clock_.second.den,
+  //    f.frame->best_effort_timestamp, f.time_base.num, f.time_base.den);
+
+  // validate
+  auto video_clock_us =
+      av_rescale_q(video_clock_.first, video_clock_.second, AV_TIME_BASE_Q);
+  auto frame_pts_us =
+      av_rescale_q(f.frame->best_effort_timestamp, f.time_base, AV_TIME_BASE_Q);
+  auto delta_us = video_clock_us - frame_pts_us;
+  if (delta_us < -1000000 || delta_us > 1000000) {
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "video clock and latest frame pts delta too big %" PRId64 "\n",
+                delta_us);
+  }
 }
