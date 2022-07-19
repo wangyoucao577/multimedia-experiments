@@ -8,15 +8,19 @@ Uint32 sdl_refresh_timer_callback(Uint32 interval, void *param) {
     return interval;
   }
 
+  auto next_interval = player->CalculateNextFrameInterval();
+  if (next_interval <= 0) {
+    next_interval = 1;
+  }
+
   SDL_UserEvent userevent{};
   userevent.type = player->sdl_refresh_event;
-
   SDL_Event event;
   event.type = SDL_USEREVENT;
   event.user = userevent;
 
   SDL_PushEvent(&event);
-  return interval;
+  return next_interval;
 }
 
 void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
@@ -30,7 +34,7 @@ void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "audio playback requires %d bytes but only got %d", len, n);
   }
-  
+
 #if defined(SAVE_PLAYBACK_AUDIO)
   if (n > 0) {
     fwrite(stream, n, 1, player->audio_file);
@@ -141,7 +145,7 @@ AVFrameExtended Player::PopVideoFrame() {
   video_frames_.pop_front();
 
   // sync video: calculate current present video clock
-  sync_video_unsafe(f);
+  SyncVideoUnsafe(f);
 
   video_frames_cv_.notify_all();
   return f;
@@ -299,13 +303,13 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     video_frame_rate_ = v_dec_ctx->framerate;
 
     // start event handler thread
-    t_ = std::thread(&Player::sdlEventProc, this);
+    t_ = std::thread(&Player::SDLEventProc, this);
 
     // add timer to trigger refresh events
-    auto refresh_interval_ms =
+    default_refresh_interval_ms_ =
         1000 * v_dec_ctx->framerate.den / v_dec_ctx->framerate.num;
-    refresh_timer_id_ =
-        SDL_AddTimer(refresh_interval_ms, sdl_refresh_timer_callback, this);
+    refresh_timer_id_ = SDL_AddTimer(default_refresh_interval_ms_,
+                                     sdl_refresh_timer_callback, this);
     if (!refresh_timer_id_) {
       SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_AddTimer failed, err %s",
                    SDL_GetError());
@@ -354,7 +358,7 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
   return 0;
 }
 
-void Player::sdlEventProc() {
+void Player::SDLEventProc() {
 
   while (true) {
     if (stop_) {
@@ -377,7 +381,7 @@ void Player::sdlEventProc() {
           continue;
         }
 
-        refreshDisplay(f.frame);
+        RefreshDisplay(f.frame);
         av_frame_free(&f.frame);
       }
     default: // TODO: process other events
@@ -386,7 +390,7 @@ void Player::sdlEventProc() {
   }
 }
 
-void Player::refreshDisplay(AVFrame *f) {
+void Player::RefreshDisplay(AVFrame *f) {
   if (!opened_) {
     return;
   }
@@ -398,7 +402,7 @@ void Player::refreshDisplay(AVFrame *f) {
   SDL_RenderPresent(renderer_);
 }
 
-void Player::sync_video_unsafe(const AVFrameExtended &f) {
+void Player::SyncVideoUnsafe(const AVFrameExtended &f) {
 
   if (video_clock_.first == 0) {
     video_clock_.first = f.frame->best_effort_timestamp;
@@ -410,12 +414,20 @@ void Player::sync_video_unsafe(const AVFrameExtended &f) {
   video_clock_.first = av_add_stable(video_clock_.second, video_clock_.first,
                                      av_inv_q(video_frame_rate_), 1);
 
-  // SDL_LogDebug(
+  //SDL_LogInfo(
   //    SDL_LOG_CATEGORY_APPLICATION,
-  //    "video clock %" PRId64 " time_base %d/%d, latest frame pts %" PRId64
-  //    ", time_base %d/%d\n",
-  //    video_clock_.first, video_clock_.second.num, video_clock_.second.den,
-  //    f.frame->best_effort_timestamp, f.time_base.num, f.time_base.den);
+  //    "video clock %" PRId64 "(%" PRId64
+  //    "ms), time_base %d/%d, latest frame pts %" PRId64 "(%" PRId64
+  //    "ms), time_base %d/%d\n",
+  //    video_clock_.first,
+  //    av_rescale_q(video_clock_.first, video_clock_.second, AV_TIME_BASE_Q) /
+  //        1000,
+  //    video_clock_.second.num, video_clock_.second.den,
+  //    f.frame->best_effort_timestamp,
+  //    av_rescale_q(f.frame->best_effort_timestamp, f.time_base,
+  //                 AV_TIME_BASE_Q) /
+  //        1000,
+  //    f.time_base.num, f.time_base.den);
 
   // validate
   auto video_clock_us =
@@ -428,4 +440,43 @@ void Player::sync_video_unsafe(const AVFrameExtended &f) {
                 "video clock and latest frame pts delta too big %" PRId64 "\n",
                 delta_us);
   }
+}
+
+std::pair<int64_t, AVRational> Player::video_clock() const {
+  std::lock_guard<std::mutex> _(video_frames_mutex_);
+  return {video_clock_.first, video_clock_.second};
+}
+
+int Player::CalculateNextFrameInterval() const {
+  assert(default_refresh_interval_ms_ > 0);
+  if (!Opened()) {
+    return default_refresh_interval_ms_;
+  }
+
+  auto v_clock = video_clock();
+  auto a_clock = audio_queue_.audio_clock();
+
+  if (v_clock.first == 0 || v_clock.second.den == 0 ||
+      v_clock.second.num == 0 || a_clock.first == 0 ||
+      a_clock.second.den == 0 || a_clock.second.num == 0) {
+    return default_refresh_interval_ms_;
+  }
+
+  auto v_clock_us = av_rescale_q(v_clock.first, v_clock.second, AV_TIME_BASE_Q);
+  auto a_clock_us = av_rescale_q(a_clock.first, a_clock.second, AV_TIME_BASE_Q);
+  auto delta_ms = (v_clock_us - a_clock_us) / 1000;
+  //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+  //            "(video_clock - audio_clock) delta %" PRId64 "ms\n", delta_ms);
+
+  auto next_interval = default_refresh_interval_ms_;
+  if (delta_ms < -200) {                     // video too slow
+    next_interval = default_refresh_interval_ms_ / 2; // go faster
+  } else if (delta_ms > 200) {               // video too fast
+    next_interval = default_refresh_interval_ms_ * 2;   // go slower
+  }
+
+  SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+              "delta(v-a) %" PRId64 " ms, next video frame refresh interval %d ms\n", delta_ms,
+              next_interval);
+  return next_interval;
 }

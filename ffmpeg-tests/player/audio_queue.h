@@ -58,11 +58,12 @@ public:
   int Read(unsigned char *buf, int len);
 
   bool Empty() const;
-  std::pair<int64_t, AVRational> front_pts() const;
+  int64_t front_pts() const;
+  AVRational time_base() const;
   std::pair<int64_t, AVRational> audio_clock() const;
 
 private:
-  void sync_audio_unsafe(const AudioSamples &audio_samples); // calculate audio clock
+  void SyncAudioUnsafe(const AudioSamples &audio_samples); // calculate audio clock
 
 private:
   std::deque<AudioSamples> queue_;

@@ -34,6 +34,9 @@ public:
   AVFrameExtended PopVideoFrame();
   void ClearVideoFrames();
 
+  // in milliseconds
+  int CalculateNextFrameInterval() const; 
+
 private:
 
   /*** video ***/ 
@@ -48,7 +51,8 @@ private:
 
   std::pair<int64_t, AVRational> video_clock_{}; // calculated video clock in AVRational (time_base)
   AVRational video_frame_rate_{};
-  void sync_video_unsafe(const AVFrameExtended &f); // calculate video clock
+  void SyncVideoUnsafe(const AVFrameExtended &f); // calculate video clock
+  std::pair<int64_t, AVRational> video_clock() const;
 
   std::atomic_bool video_flushed_{false};
 
@@ -56,8 +60,9 @@ private:
 
   std::thread t_;   // thread to respond SDL events, mandantory for video
 
-  void sdlEventProc();
-  void refreshDisplay(AVFrame *f);
+  int default_refresh_interval_ms_{0};
+  void SDLEventProc();
+  void RefreshDisplay(AVFrame *f);
   /*** video ***/ 
 
   /*** audio ***/ 

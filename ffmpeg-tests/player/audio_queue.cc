@@ -27,21 +27,26 @@ int AudioSamplesQueue::Read(unsigned char *buf, int len) {
       queue_.pop_front();
 
       // sync audio: calculate audio clock
-      sync_audio_unsafe(audio_samples);
+      SyncAudioUnsafe(audio_samples);
     }
   }
 
   return n;
 }
 
-std::pair<int64_t, AVRational> AudioSamplesQueue::front_pts() const {
+int64_t AudioSamplesQueue::front_pts() const {
   std::lock_guard<std::mutex> _(mutex_);
-  return std::pair<int64_t, AVRational>{front_pts_, time_base_};
+  return front_pts_;
+}
+
+AVRational AudioSamplesQueue::time_base() const { 
+  std::lock_guard<std::mutex> _(mutex_);
+  return time_base_;
 }
 
 std::pair<int64_t, AVRational> AudioSamplesQueue::audio_clock() const {
   std::lock_guard<std::mutex> _(mutex_);
-  return std::pair<int64_t, AVRational>{audio_clock_, time_base_};
+  return {audio_clock_, time_base_};
 }
 
 bool AudioSamplesQueue::Empty() const { 
@@ -49,7 +54,7 @@ bool AudioSamplesQueue::Empty() const {
     return queue_.empty();
 }
 
-void AudioSamplesQueue::sync_audio_unsafe(const AudioSamples &audio_samples) {
+void AudioSamplesQueue::SyncAudioUnsafe(const AudioSamples &audio_samples) {
 
   // calculate audio_clock
   audio_clock_ = av_add_stable(time_base_, audio_clock_, time_base_,
@@ -58,6 +63,9 @@ void AudioSamplesQueue::sync_audio_unsafe(const AudioSamples &audio_samples) {
   // validate
   auto audio_clock_us = av_rescale_q(audio_clock_, time_base_, AV_TIME_BASE_Q);
   auto frame_pts_us = av_rescale_q(front_pts_, time_base_, AV_TIME_BASE_Q);
+  //av_log(NULL, AV_LOG_INFO, "audio clock %" PRId64 "ms), latest frame pts %" PRId64 "ms\n",
+  //       audio_clock_us/1000, frame_pts_us/1000);
+
   auto delta_us = audio_clock_us - frame_pts_us;
   if (delta_us < -1000000 || delta_us > 1000000) {
     av_log(NULL, AV_LOG_WARNING,
