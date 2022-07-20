@@ -202,10 +202,6 @@ int Player::Close() {
     audio_device_id_ = 0;
   }
 
-  if (t_.joinable()) {
-    t_.join();
-  }
-
   if (refresh_timer_id_) {
     SDL_RemoveTimer(refresh_timer_id_);
     refresh_timer_id_ = 0;
@@ -304,9 +300,6 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
     assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
     video_frame_rate_ = v_dec_ctx->framerate;
 
-    // start event handler thread
-    t_ = std::thread(&Player::SDLEventProc, this);
-
     // add timer to trigger refresh events
     default_refresh_interval_ms_ =
         1000 * v_dec_ctx->framerate.den / v_dec_ctx->framerate.num;
@@ -360,13 +353,8 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
   return 0;
 }
 
-void Player::SDLEventProc() {
-
-  while (true) {
-    if (stop_) {
-      break;
-    }
-
+bool Player::SDLEventProc() {
+  while (!stop_) {
     SDL_Event event;
     auto ret = SDL_PollEvent(&event);
     if (ret <= 0) {
@@ -374,10 +362,16 @@ void Player::SDLEventProc() {
     }
 
     switch (event.type) {
+    case SDL_QUIT:
+      SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "event %u quit\n", event.type);
+      return true;
     default: // TODO: process other events
+      //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "event %u\n", event.type);
       break;
     }
   }
+
+  return false;
 }
 
 void Player::RefreshDisplay(AVFrame *f) {

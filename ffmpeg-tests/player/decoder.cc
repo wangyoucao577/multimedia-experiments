@@ -24,7 +24,7 @@ void Decoder::Close() {
 }
 
 void Decoder::DumpInputFormat() const {
-  if (!opened) {
+  if (!opened_) {
     return;
   }
 
@@ -32,7 +32,7 @@ void Decoder::DumpInputFormat() const {
 }
 
 int Decoder::Open() {
-  if (opened) {
+  if (opened_) {
     return AVERROR_OK;
   }
 
@@ -146,12 +146,12 @@ int Decoder::Open() {
   pkt_ = av_packet_alloc();
   assert(pkt_);
 
-  opened = true;
+  opened_.store(true);
   return AVERROR_OK;
 }
 
 int Decoder::Run() {
-  if (!opened) {
+  if (!opened_) {
     av_log(NULL, AV_LOG_ERROR, "decoding has NOT been opened yet\n");
     return AVERROR_UNKNOWN;
   }
@@ -162,7 +162,7 @@ int Decoder::Run() {
 int Decoder::run() {
   auto ret = AVERROR_OK;
 
-  while (true) {
+  while (opened_) {
     ret = av_read_frame(ifmt_ctx_, pkt_);
     if (ret < 0) {
       if (ret == AVERROR_EOF) {
@@ -238,6 +238,10 @@ int Decoder::run() {
       }
       return ret;
     }
+  }
+
+  if (!opened_) {   // exit due to stop rather than all data consumed, no need to flush
+    return AVERROR_OK;
   }
 
   for (auto i = 0; i < nb_streams_; ++i) {
@@ -320,6 +324,8 @@ int Decoder::receive_frames(int stream_index) {
   return ret;
 }
 
+void Decoder::Stop() { opened_.store(false); }
+
 void Decoder::Join() {
   if (t_.joinable()) {
     t_.join();
@@ -327,7 +333,7 @@ void Decoder::Join() {
 }
 
 int Decoder::RunAsync(std::function<ErrorCallback> error_callback) {
-  if (!opened) {
+  if (!opened_) {
     return AVERROR_OK;
   }
   error_callback_ = std::move(error_callback);

@@ -86,6 +86,11 @@ int main(int argc, char *argv[]) {
   }
   dec->RunAsync(std::move(err_func));
 
+  auto exit_by_quit = player->SDLEventProc();
+
+  if (exit_by_quit) {
+    dec->Stop();
+  }
   dec->Join();
   dec->Close();
   player->Close();

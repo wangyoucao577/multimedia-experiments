@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 #include <thread>
+#include <atomic>
 
 #include "libav_headers.h"
 
@@ -28,6 +29,7 @@ public:
   int Run();
   int RunAsync(std::function<ErrorCallback> error_callback);
   void Join();
+  void Stop();  // stop before all data consumed
 
   void DumpInputFormat() const;
   const AVFormatContext *InputContext() const { return ifmt_ctx_; }
@@ -58,7 +60,7 @@ private:
   AVPacket *pkt_{nullptr};
 
 private:
-  bool opened{false};
+  std::atomic_bool opened_{false};
   std::thread t_;
 
   std::function<DataCallback> data_callback_ = nullptr;

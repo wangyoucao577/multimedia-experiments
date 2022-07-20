@@ -39,6 +39,9 @@ public:
   // in milliseconds
   int CalculateNextFrameInterval(const AVFrameExtended &f); 
 
+  // return false means normal exit, true means by quit event
+  bool SDLEventProc();
+
 private:
 
   /*** video ***/ 
@@ -64,10 +67,8 @@ private:
   std::atomic_bool video_flushed_{false};
 
   SDL_TimerID refresh_timer_id_{0}; // timer to trigger refresh event
-  std::thread t_;   // thread to respond SDL events, mandantory for video
 
   int default_refresh_interval_ms_{0};
-  void SDLEventProc();
   /*** video ***/ 
 
   /*** audio ***/ 
