@@ -8,18 +8,20 @@ Uint32 sdl_refresh_timer_callback(Uint32 interval, void *param) {
     return interval;
   }
 
-  auto next_interval = player->CalculateNextFrameInterval();
+  auto f = player->PopVideoFrame();
+  if (!f.frame) {
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "video refresh but no frame available");
+    return interval;
+  }
+
+  auto next_interval = player->CalculateNextFrameInterval(f);
   if (next_interval <= 0) {
     next_interval = 1;
   }
 
-  SDL_UserEvent userevent{};
-  userevent.type = player->sdl_refresh_event;
-  SDL_Event event;
-  event.type = SDL_USEREVENT;
-  event.user = userevent;
-
-  SDL_PushEvent(&event);
+  player->RefreshDisplay(f.frame);
+  av_frame_free(&f.frame);
   return next_interval;
 }
 
@@ -372,18 +374,6 @@ void Player::SDLEventProc() {
     }
 
     switch (event.type) {
-    case SDL_USEREVENT:
-      if (event.user.type == sdl_refresh_event) { // refresh
-        auto f = PopVideoFrame();
-        if (!f.frame) {
-          SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                      "video refresh but no frame available");
-          continue;
-        }
-
-        RefreshDisplay(f.frame);
-        av_frame_free(&f.frame);
-      }
     default: // TODO: process other events
       break;
     }
@@ -435,7 +425,7 @@ void Player::SyncVideoUnsafe(const AVFrameExtended &f) {
   auto frame_pts_us =
       av_rescale_q(f.frame->best_effort_timestamp, f.time_base, AV_TIME_BASE_Q);
   auto delta_us = video_clock_us - frame_pts_us;
-  if (delta_us < -1000000 || delta_us > 1000000) {
+  if (delta_us < -1000000 || delta_us > 1000000) {  // only check whether delta too big
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "video clock and latest frame pts delta too big %" PRId64 "\n",
                 delta_us);
@@ -447,36 +437,71 @@ std::pair<int64_t, AVRational> Player::video_clock() const {
   return {video_clock_.first, video_clock_.second};
 }
 
-int Player::CalculateNextFrameInterval() const {
+int Player::CalculateNextFrameInterval(const AVFrameExtended& f) {
   assert(default_refresh_interval_ms_ > 0);
   if (!Opened()) {
     return default_refresh_interval_ms_;
   }
 
-  auto v_clock = video_clock();
   auto a_clock = audio_queue_.audio_clock();
-
-  if (v_clock.first == 0 || v_clock.second.den == 0 ||
-      v_clock.second.num == 0 || a_clock.first == 0 ||
-      a_clock.second.den == 0 || a_clock.second.num == 0) {
+  if (a_clock.first == 0 || a_clock.second.den == 0 ||
+      a_clock.second.num == 0) {
     return default_refresh_interval_ms_;
   }
 
-  auto v_clock_us = av_rescale_q(v_clock.first, v_clock.second, AV_TIME_BASE_Q);
-  auto a_clock_us = av_rescale_q(a_clock.first, a_clock.second, AV_TIME_BASE_Q);
-  auto delta_ms = (v_clock_us - a_clock_us) / 1000;
-  //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-  //            "(video_clock - audio_clock) delta %" PRId64 "ms\n", delta_ms);
-
-  auto next_interval = default_refresh_interval_ms_;
-  if (delta_ms < -200) {                     // video too slow
-    next_interval = default_refresh_interval_ms_ / 2; // go faster
-  } else if (delta_ms > 200) {               // video too fast
-    next_interval = default_refresh_interval_ms_ * 2;   // go slower
+  if (last_frame_pts_.first == 0) { // initialize
+    last_frame_pts_ = {f.frame->pts, f.time_base};
+    last_frame_delay_ = (double)default_refresh_interval_ms_ / 1000;
   }
 
+  auto last_pts = av_q2d(last_frame_pts_.second) * last_frame_pts_.first;
+  auto pts = av_q2d(f.time_base) * f.frame->best_effort_timestamp;  // seconds
+  auto delay = pts - last_pts;
+  if (delay <= 0 || delay >= 1.0) { // if incorrect delay, ues previous one
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                "invalid delay(v_pts-v_last_pts) %f seconds\n", delay);
+    delay = last_frame_delay_;
+  }
+
+  // save for next time
+  last_frame_delay_ = delay;
+  last_frame_pts_ = {f.frame->pts, f.time_base};
+
+  const double kAVSyncThreshold = 0.01; // seconds
+  auto sync_threshold = delay > kAVSyncThreshold ? delay : kAVSyncThreshold;
+
+  auto ref_clock = av_q2d(a_clock.second) * a_clock.first;
+  auto diff = pts - ref_clock;
+  if (diff < -sync_threshold) { // video too slow
+    delay /= 2;  // go faster
+    SDL_LogInfo(
+        SDL_LOG_CATEGORY_APPLICATION,
+        "diff(v_pts-a_clock) %f seconds < -%f, video goes too slow, half "
+        "delay to %f seconds\n",
+        diff, sync_threshold, delay);
+  } else if (diff > sync_threshold) {    // video too fast
+    delay *= 2;  // go slower
+    SDL_LogInfo(
+        SDL_LOG_CATEGORY_APPLICATION,
+        "diff(v_pts-a_clock) %f seconds > %f, video goes too fast, double "
+        "delay to %f seconds\n",
+        diff, sync_threshold, delay);
+  }
+
+  if (frame_timer_ < 0.00001) { // empty value
+    frame_timer_ = (double)av_gettime() / 1000000;
+  }
+  frame_timer_ += delay;
+  
+  auto actual_delay = frame_timer_ - (double)av_gettime() / 1000000;
+  if (actual_delay < 0.010) {
+    actual_delay = 0.010;   // at least 10 ms per refresh
+  }
+  auto next_interval = (int)(actual_delay * 1000);
+
   SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-              "delta(v-a) %" PRId64 " ms, next video frame refresh interval %d ms\n", delta_ms,
-              next_interval);
+              "sync video to audio, delay(v_pts-v_last_pts) %f seconds, "
+              "diff(v-a) %f seconds, next video frame refresh interval %d ms\n",
+              delay, diff, next_interval);
   return next_interval;
 }

@@ -34,8 +34,10 @@ public:
   AVFrameExtended PopVideoFrame();
   void ClearVideoFrames();
 
+  void RefreshDisplay(AVFrame *f);
+
   // in milliseconds
-  int CalculateNextFrameInterval() const; 
+  int CalculateNextFrameInterval(const AVFrameExtended &f); 
 
 private:
 
@@ -54,15 +56,18 @@ private:
   void SyncVideoUnsafe(const AVFrameExtended &f); // calculate video clock
   std::pair<int64_t, AVRational> video_clock() const;
 
+  // these 3 vars only will be used in CalculateNextFrameInterval, no need multithreading protection
+  std::pair<int64_t, AVRational> last_frame_pts_{};
+  double last_frame_delay_{0.0}; // seconds
+  double frame_timer_{0.0};
+
   std::atomic_bool video_flushed_{false};
 
   SDL_TimerID refresh_timer_id_{0}; // timer to trigger refresh event
-
   std::thread t_;   // thread to respond SDL events, mandantory for video
 
   int default_refresh_interval_ms_{0};
   void SDLEventProc();
-  void RefreshDisplay(AVFrame *f);
   /*** video ***/ 
 
   /*** audio ***/ 
