@@ -53,6 +53,7 @@ int Player::PushAudioFrame(AVFrameExtended f) {
   if (!f.frame ||
       !f.frame->data[0]) { // empty frame, no more data will be pushed
     audio_flushed_.store(true);
+    StopSDLEventProc();
     return 0;
   }
 
@@ -114,6 +115,7 @@ int Player::PushVideoFrame(AVFrameExtended f) {
   if (!f.frame ||
       !f.frame->data[0]) { // empty frame, no more data will be pushed
     video_flushed_.store(true);
+    StopSDLEventProc();
     return 0;
   }
 
@@ -365,6 +367,12 @@ bool Player::SDLEventProc() {
     case SDL_QUIT:
       SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "event %u quit\n", event.type);
       return true;
+    case SDL_USEREVENT:
+      SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "event %u user type %u\n",
+                  event.type, event.user.type);
+      if (event.user.type == kSDLEventProcStopEvent) {
+        return false;
+      }
     default: // TODO: process other events
       //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "event %u\n", event.type);
       break;
@@ -372,6 +380,17 @@ bool Player::SDLEventProc() {
   }
 
   return false;
+}
+
+void Player::StopSDLEventProc() const {
+  SDL_UserEvent userevent{};
+  userevent.type = kSDLEventProcStopEvent;
+
+  SDL_Event event;
+  event.type = SDL_USEREVENT;
+  event.user = userevent;
+
+  SDL_PushEvent(&event);
 }
 
 void Player::RefreshDisplay(AVFrame *f) {

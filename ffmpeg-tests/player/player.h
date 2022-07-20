@@ -41,6 +41,7 @@ public:
 
   // return false means normal exit, true means by quit event
   bool SDLEventProc();
+  void StopSDLEventProc() const;
 
 private:
 
@@ -83,8 +84,8 @@ private:
   /*** audio ***/
 
 public:
-  const uint32_t sdl_refresh_event{
-      SDL_RegisterEvents(1)}; // register refresh event
+  const uint32_t kSDLEventProcStopEvent{
+      SDL_RegisterEvents(1)}; // register customized event
 
 private:
   const bool enable_video_{false};
