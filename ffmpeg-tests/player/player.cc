@@ -443,7 +443,9 @@ int Player::CalculateNextFrameInterval(const AVFrameExtended& f) {
     return default_refresh_interval_ms_;
   }
 
+  bool first_frame = false;
   if (last_frame_pts_.first == 0) { // initialize
+    first_frame = true;
     last_frame_pts_ = {f.frame->pts, f.time_base};
     last_frame_delay_ = (double)default_refresh_interval_ms_ / 1000;
   }
@@ -451,7 +453,8 @@ int Player::CalculateNextFrameInterval(const AVFrameExtended& f) {
   auto last_pts = av_q2d(last_frame_pts_.second) * last_frame_pts_.first;
   auto pts = av_q2d(f.time_base) * f.frame->best_effort_timestamp;  // seconds
   auto delay = pts - last_pts;
-  if (delay <= 0 || delay >= 1.0) { // if incorrect delay, ues previous one
+  if ((delay <= 0 || delay >= 1.0) &&
+      !first_frame) { // if incorrect delay, ues previous one
     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                 "invalid delay(v_pts-v_last_pts) %f seconds\n", delay);
     delay = last_frame_delay_;
