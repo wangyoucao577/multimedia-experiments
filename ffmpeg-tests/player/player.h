@@ -55,11 +55,6 @@ private:
   std::condition_variable video_frames_cv_;
   const int kMaxCacheFrames{50};
 
-  std::pair<int64_t, AVRational> video_clock_{}; // calculated video clock in AVRational (time_base)
-  AVRational video_frame_rate_{};
-  void SyncVideoUnsafe(const AVFrameExtended &f); // calculate video clock
-  std::pair<int64_t, AVRational> video_clock() const;
-
   // these 3 vars only will be used in CalculateNextFrameInterval, no need multithreading protection
   std::pair<int64_t, AVRational> last_frame_pts_{};
   double last_frame_delay_{0.0}; // seconds
@@ -68,7 +63,6 @@ private:
   std::atomic_bool video_flushed_{false};
 
   SDL_TimerID refresh_timer_id_{0}; // timer to trigger refresh event
-
   int default_refresh_interval_ms_{0};
   /*** video ***/ 
 

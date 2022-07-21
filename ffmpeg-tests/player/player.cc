@@ -147,10 +147,6 @@ AVFrameExtended Player::PopVideoFrame() {
 
   auto f = video_frames_.front();
   video_frames_.pop_front();
-
-  // sync video: calculate current present video clock
-  SyncVideoUnsafe(f);
-
   video_frames_cv_.notify_all();
   return f;
 }
@@ -298,11 +294,8 @@ int Player::Open(const AVCodecContext *v_dec_ctx,
       return -1;
     }
 
-    // initial frame rate of video_clock
-    assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
-    video_frame_rate_ = v_dec_ctx->framerate;
-
     // add timer to trigger refresh events
+    assert(v_dec_ctx->framerate.num > 0 && v_dec_ctx->framerate.den > 0);
     default_refresh_interval_ms_ =
         1000 * v_dec_ctx->framerate.den / v_dec_ctx->framerate.num;
     refresh_timer_id_ = SDL_AddTimer(default_refresh_interval_ms_,
@@ -403,51 +396,6 @@ void Player::RefreshDisplay(AVFrame *f) {
                        f->linesize[1], f->data[2], f->linesize[2]);
   SDL_RenderCopy(renderer_, texture_, NULL, NULL);
   SDL_RenderPresent(renderer_);
-}
-
-void Player::SyncVideoUnsafe(const AVFrameExtended &f) {
-
-  if (video_clock_.first == 0) {
-    video_clock_.first = f.frame->best_effort_timestamp;
-    video_clock_.second = f.time_base;
-    return;
-  }
-
-  assert(video_frame_rate_.den > 0 && video_frame_rate_.num > 0);
-  video_clock_.first = av_add_stable(video_clock_.second, video_clock_.first,
-                                     av_inv_q(video_frame_rate_), 1);
-
-  //SDL_LogInfo(
-  //    SDL_LOG_CATEGORY_APPLICATION,
-  //    "video clock %" PRId64 "(%" PRId64
-  //    "ms), time_base %d/%d, latest frame pts %" PRId64 "(%" PRId64
-  //    "ms), time_base %d/%d\n",
-  //    video_clock_.first,
-  //    av_rescale_q(video_clock_.first, video_clock_.second, AV_TIME_BASE_Q) /
-  //        1000,
-  //    video_clock_.second.num, video_clock_.second.den,
-  //    f.frame->best_effort_timestamp,
-  //    av_rescale_q(f.frame->best_effort_timestamp, f.time_base,
-  //                 AV_TIME_BASE_Q) /
-  //        1000,
-  //    f.time_base.num, f.time_base.den);
-
-  // validate
-  auto video_clock_us =
-      av_rescale_q(video_clock_.first, video_clock_.second, AV_TIME_BASE_Q);
-  auto frame_pts_us =
-      av_rescale_q(f.frame->best_effort_timestamp, f.time_base, AV_TIME_BASE_Q);
-  auto delta_us = video_clock_us - frame_pts_us;
-  if (delta_us < -1000000 || delta_us > 1000000) {  // only check whether delta too big
-    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                "video clock and latest frame pts delta too big %" PRId64 "\n",
-                delta_us);
-  }
-}
-
-std::pair<int64_t, AVRational> Player::video_clock() const {
-  std::lock_guard<std::mutex> _(video_frames_mutex_);
-  return {video_clock_.first, video_clock_.second};
 }
 
 int Player::CalculateNextFrameInterval(const AVFrameExtended& f) {
