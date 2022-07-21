@@ -56,10 +56,8 @@ public:
 public:
   bool Write(AudioSamples &&audio_samples);
   int Read(unsigned char *buf, int len);
-
   bool Empty() const;
-  int64_t front_pts() const;
-  AVRational time_base() const;
+
   std::pair<int64_t, AVRational> audio_clock() const;
 
 private:
@@ -71,5 +69,5 @@ private:
 
   int64_t front_pts_{0};
   AVRational time_base_{0};
-  int64_t audio_clock_{0};  // calculated, use same time_base_
+  int64_t audio_timer_{0};  // calculated, use same time_base_
 };
