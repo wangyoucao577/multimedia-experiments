@@ -3,19 +3,19 @@
 #include "square_root.h"
 #include <iostream>
 
-class MySqrRootCallback : public AsyncCallback {
+class MySuqareRootCallback : public AsyncCallback {
   HANDLE event_;
-  SquareRoot *sqr_root_;
+  SquareRoot *suqare_root_;
   double val_;
 
   HRESULT hr_status_;
 
 public:
-  MySqrRootCallback(SquareRoot *sqr_root, HRESULT *hr)
-      : sqr_root_(sqr_root), hr_status_(E_PENDING) {
+    MySuqareRootCallback(SquareRoot * suqare_root, HRESULT *hr)
+      : suqare_root_(suqare_root), hr_status_(E_PENDING) {
     *hr = S_OK;
 
-    sqr_root_->AddRef();
+    suqare_root_->AddRef();
 
     event_ = CreateEvent(NULL, FALSE, FALSE, NULL);
 
@@ -23,8 +23,8 @@ public:
       *hr = HRESULT_FROM_WIN32(GetLastError());
     }
   }
-  ~MySqrRootCallback() {
-    sqr_root_->Release();
+  ~MySuqareRootCallback() {
+    suqare_root_->Release();
     CloseHandle(event_);
   }
 
@@ -47,7 +47,7 @@ public:
   double value() const { return val_; }
 
   STDMETHODIMP Invoke(IMFAsyncResult *pResult) override {
-    hr_status_ = sqr_root_->EndSquareRoot(pResult, &val_);
+    hr_status_ = suqare_root_->EndSquareRoot(pResult, &val_);
 
     SetEvent(event_);
 
@@ -65,12 +65,12 @@ int main() {
   double x = 1.1;
   SquareRoot s;
 
-  auto pCB = new (std::nothrow) MySqrRootCallback(&s, &hr);
+  auto pCB = new (std::nothrow) MySuqareRootCallback(&s, &hr);
   if (pCB == NULL) {
     hr = E_OUTOFMEMORY;
   }
   if (FAILED(hr)) {
-    std::cout << "create MySqrRootCallback failed, err " << hr << std::endl;
+    std::cout << "create MySuqareRootCallback failed, err " << hr << std::endl;
     return -1;
   }
 

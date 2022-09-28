@@ -10,7 +10,7 @@ template <class T> void SafeRelease(T **ppT) {
 }
 
 HRESULT SquareRoot::BeginSquareRoot(double x, IMFAsyncCallback *pCB,
-                                 IUnknown *pState) {
+                                    IUnknown *pState) {
   AsyncOp *pOp = new (std::nothrow) AsyncOp(x);
   if (pOp == NULL) {
     return E_OUTOFMEMORY;
@@ -28,7 +28,7 @@ HRESULT SquareRoot::BeginSquareRoot(double x, IMFAsyncCallback *pCB,
   if (SUCCEEDED(hr)) {
     // Queue a work item. The work item contains pointers to:
     //
-    // 1. The callback interface of the SqrRoot object.
+    // 1. The callback interface of the SuqareRoot object.
     // 2. The inner result object.
     hr = MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_STANDARD, this, pResult);
 
