@@ -5,8 +5,8 @@
 
 class MySuqareRootCallback : public AsyncCallback {
   HANDLE event_;
-  SquareRoot *suqare_root_;
-  double val_;
+  SquareRoot *suqare_root_{nullptr};
+  double val_{0.};
 
   HRESULT hr_status_;
 
@@ -63,9 +63,13 @@ int main() {
   }
 
   double x = 1.1;
-  SquareRoot s;
+  auto s = new (std::nothrow) SquareRoot();
+  if (!s) {
+    std::cout << "create SquareRoot failed" << std::endl;
+    return -1;
+  }
 
-  auto pCB = new (std::nothrow) MySuqareRootCallback(&s, &hr);
+  auto pCB = new (std::nothrow) MySuqareRootCallback(s, &hr);
   if (pCB == NULL) {
     hr = E_OUTOFMEMORY;
   }
@@ -74,8 +78,8 @@ int main() {
     return -1;
   }
 
-  // Start an asynchronous request to read data.
-  hr = s.BeginSquareRoot(x, pCB, nullptr);
+  // Start an asynchronous request to calculate data.
+  hr = s->BeginSquareRoot(x, pCB, nullptr);
   if (FAILED(hr)) {
     std::cout << "BeginSquareRoot err " << hr << std::endl;
     return -1;
