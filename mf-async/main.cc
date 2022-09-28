@@ -11,7 +11,7 @@ class MySuqareRootCallback : public AsyncCallback {
   HRESULT hr_status_;
 
 public:
-    MySuqareRootCallback(SquareRoot * suqare_root, HRESULT *hr)
+  MySuqareRootCallback(SquareRoot *suqare_root, HRESULT *hr)
       : suqare_root_(suqare_root), hr_status_(E_PENDING) {
     *hr = S_OK;
 
