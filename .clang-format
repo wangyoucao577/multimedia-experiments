@@ -2,3 +2,4 @@
 # Based on LLVM Coding Standards: https://llvm.org/docs/CodingStandards.html
 BasedOnStyle: LLVM
 SortIncludes: Never
+ColumnLimit: 100
