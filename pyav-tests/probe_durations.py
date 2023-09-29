@@ -45,11 +45,61 @@ class StreamInfo:
     def __init__(self, stream):
         self.stream = stream
 
+    def capture_by_packet(self, packet):
+        if self.time_base is None and packet.time_base is not None:
+            self.time_base = packet.time_base
+
+        if self.first_dts is None and packet.dts is not None:
+            self.first_dts = packet.dts
+        if self.first_pts is None and packet.pts is not None:
+            self.first_pts = packet.pts
+
+        if packet.dts is not None:
+            self.last_dts = packet.dts
+        if packet.pts is not None:
+            self.last_pts = packet.pts
+        if packet.duration is not None:
+            self.last_duration = packet.duration
+            self.duration_by_sum += packet.duration
+
+        if packet.dts is not None and packet.pts is not None and packet.pts >= 0:
+            if self.first_valid_packet_pts is None:
+                self.first_valid_packet_dts = packet.dts
+            if self.first_valid_packet_pts is None:
+                self.first_valid_packet_pts = packet.pts
+            if self.smallest_valid_pts is None or self.smallest_valid_pts >= packet.pts:
+                self.smallest_valid_pts = packet.pts
+            if self.biggest_pts is None or self.biggest_pts < packet.pts:
+                self.biggest_pts = packet.pts
+                self.biggest_pts_packet_duration = packet.duration
+
+    def capture_by_frame(self, frame):
+        if self.first_dts is None and frame.dts is not None:
+            self.first_dts = frame.dts
+        if self.first_pts is None and frame.pts is not None:
+            self.first_pts = frame.pts
+
+        if frame.dts is not None:
+            self.last_dts = frame.dts
+        if frame.pts is not None:
+            self.last_pts = frame.pts
+
+        if frame.pts is not None and frame.pts >= 0:
+            if self.smallest_valid_pts is None or self.smallest_valid_pts >= frame.pts:
+                self.smallest_valid_pts = frame.pts
+            if self.biggest_pts is None or self.biggest_pts < frame.pts:
+                self.biggest_pts = frame.pts
+
     def calculate_durations(self):
         # calc duration by dts/pts
-        self.duration_by_dts = self.last_dts - self.first_dts
-        self.duration_by_pts = self.biggest_pts - self.smallest_valid_pts
-        self.duration_by_pts_and_start_time = self.biggest_pts - self.stream.start_time
+        if self.last_dts is not None and self.first_dts is not None:
+            self.duration_by_dts = self.last_dts - self.first_dts
+        if self.biggest_pts is not None and self.smallest_valid_pts is not None:
+            self.duration_by_pts = self.biggest_pts - self.smallest_valid_pts
+        if self.biggest_pts is not None and self.stream.start_time is not None:
+            self.duration_by_pts_and_start_time = (
+                self.biggest_pts - self.stream.start_time
+            )
         if self.last_duration is not None:
             self.duration_by_dts += self.last_duration
         if self.biggest_pts_packet_duration is not None:
@@ -154,17 +204,6 @@ class StreamInfo:
             self.biggest_pts_packet_duration, "biggest_pts_packet_duration"
         )
 
-    def validate_duration(self):
-        if self.stream.duration is None:
-            return
-
-        # print(f"stream[{self.stream.index}] {self.stream.type}")
-        # self.print_timestamp(
-        #     self.duration_delta_by_pts,
-        #     "duration_delta_by_pts",
-        #     suffix="    # the most confident",
-        # )
-
 
 def main():
     parser = argparse.ArgumentParser(description="calculate duraitons.")
@@ -177,6 +216,14 @@ def main():
         help="dump basic and calculated durations",
         dest="dump",
     )
+    parser.add_argument(
+        "--decode",
+        required=False,
+        default=False,
+        action="store_true",
+        help="decoding instead of demuxing",
+    )
+
     args = parser.parse_args()
     # print(args)
 
@@ -190,42 +237,24 @@ def main():
             print(f"  bit_rate {container.bit_rate}")
 
         streams_info = []
-        for stream in container.streams:
-            # print(stream)
-            streams_info.append(StreamInfo(stream))
 
-        for packet in container.demux():
-            # print(packet)
-            if packet.size == 0:
-                continue  # empty packet for flushing, ignore it
-
-            si = streams_info[packet.stream_index]
-            if si.time_base is None and packet.time_base is not None:
-                si.time_base = packet.time_base
-
-            if si.first_dts is None and packet.dts is not None:
-                si.first_dts = packet.dts
-            if si.first_pts is None and packet.pts is not None:
-                si.first_pts = packet.pts
-
-            if packet.dts is not None:
-                si.last_dts = packet.dts
-            if packet.pts is not None:
-                si.last_pts = packet.pts
-            if packet.duration is not None:
-                si.last_duration = packet.duration
-                si.duration_by_sum += packet.duration
-
-            if packet.dts is not None and packet.pts is not None and packet.pts >= 0:
-                if si.first_valid_packet_pts is None:
-                    si.first_valid_packet_dts = packet.dts
-                if si.first_valid_packet_pts is None:
-                    si.first_valid_packet_pts = packet.pts
-                if si.smallest_valid_pts is None or si.smallest_valid_pts >= packet.pts:
-                    si.smallest_valid_pts = packet.pts
-                if si.biggest_pts is None or si.biggest_pts < packet.pts:
-                    si.biggest_pts = packet.pts
-                    si.biggest_pts_packet_duration = packet.duration
+        if args.decode:
+            for stream in container.streams:
+                si = StreamInfo(stream)
+                si.time_base = stream.time_base
+                for frame in container.decode(stream):
+                    # print(frame)
+                    si.capture_by_frame(frame)
+                streams_info.append(si)
+        else:
+            for stream in container.streams:
+                streams_info.append(StreamInfo(stream))
+            for packet in container.demux():
+                # print(packet)
+                if packet.size == 0:
+                    continue  # empty packet for flushing, ignore it
+                si = streams_info[packet.stream_index]
+                si.capture_by_packet(packet)
 
         for si in streams_info:
             si.calculate_durations()
@@ -233,9 +262,6 @@ def main():
         if args.dump:
             for si in streams_info:
                 si.dump()
-        if args.validate:
-            for si in streams_info:
-                si.validate_duration()
 
 
 if __name__ == "__main__":
