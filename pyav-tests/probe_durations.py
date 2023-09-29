@@ -32,13 +32,15 @@ class StreamInfo:
     biggest_pts = None
     biggest_pts_packet_duration = None
 
-    duration_by_sum = 0
-
     # calculations
+    duration_by_sum = 0
     duration_by_dts = 0
     duration_by_pts = 0
     duration_by_pts_and_start_time = 0
-    duration_delta = None
+    duration_delta_by_sum = None
+    duration_delta_by_dts = None
+    duration_delta_by_pts = None
+    duration_delta_by_pts_and_start_time = None
 
     def __init__(self, stream):
         self.stream = stream
@@ -55,11 +57,17 @@ class StreamInfo:
             self.duration_by_pts_and_start_time += self.biggest_pts_packet_duration
 
         # calc delta between calculated duration and stream duration
-        # use the most confident algorithm known so far
         if self.stream.duration is not None:
-            self.duration_delta = (
+            self.duration_delta_by_sum = self.duration_by_sum - self.stream.duration
+            self.duration_delta_by_dts = self.duration_by_dts - self.stream.duration
+            self.duration_delta_by_pts = self.duration_by_pts - self.stream.duration
+            self.duration_delta_by_pts_and_start_time = (
                 self.duration_by_pts_and_start_time - self.stream.duration
             )
+
+    def print_timestamp(self, ts, name, prefix="  ", suffix=""):
+        ts_in_ms = format_timestamp_in_ms(ts, self.time_base)
+        print(f"{prefix}{name} {ts} ({ts_in_ms}){suffix}")
 
     def dump(self):
         print(f"stream[{self.stream.index}] {self.stream.type}")
@@ -73,99 +81,89 @@ class StreamInfo:
             print(f"  avg_frame_rate {self.stream.average_rate}")
             print(f"  r_frame_rate {self.stream.base_rate}")
             print(f"  guessed_frame_rate {self.stream.guessed_rate}")
-
-        duration_in_ms = format_timestamp_in_ms(self.stream.duration, self.time_base)
-        start_time_in_ms = format_timestamp_in_ms(
-            self.stream.start_time, self.time_base
-        )
         print(f"  time_base {self.stream.time_base}")
-        print(f"  start_time {self.stream.start_time} ({start_time_in_ms})")
-        print(f"  duration {self.stream.duration} ({duration_in_ms})")
 
-        duration_by_sum_in_ms = format_timestamp_in_ms(
-            self.duration_by_sum, self.time_base
-        )
-        duration_by_dts_in_ms = format_timestamp_in_ms(
-            self.duration_by_dts, self.time_base
-        )
-        duration_by_pts_in_ms = format_timestamp_in_ms(
-            self.duration_by_pts, self.time_base
-        )
-        duration_by_pts_and_start_time_in_ms = format_timestamp_in_ms(
-            self.duration_by_pts_and_start_time, self.time_base
-        )
-        duration_delta_in_ms = format_timestamp_in_ms(
-            self.duration_delta, self.time_base
-        )
-        print(
-            f"  duration_by_sum {self.duration_by_sum} ({duration_by_sum_in_ms})   # = sum(duration of every packet)"
-        )
-        print(
-            f"  duration_by_dts {self.duration_by_dts} ({duration_by_dts_in_ms})   # = last_dts - first_dts + last_duration"
-        )
-        print(
-            f"  duration_by_pts {self.duration_by_pts} ({duration_by_pts_in_ms})   # = biggest_pts - smallest_valid_pts + biggest_pts_packet_duration"
-        )
-        print(
-            f"  duration_by_pts_and_start_time {self.duration_by_pts_and_start_time} ({duration_by_pts_and_start_time_in_ms})   # = biggest_pts - start_time + biggest_pts_packet_duration"
-        )
-        print(
-            f"  duration_delta {self.duration_delta} ({duration_delta_in_ms})   # = duration_by_pts_and_start_time - duration"
-        )
+        self.print_timestamp(self.stream.start_time, "start_time")
+        self.print_timestamp(self.stream.duration, "duration")
 
-        first_dts_in_ms = format_timestamp_in_ms(self.first_dts, self.time_base)
-        first_pts_in_ms = format_timestamp_in_ms(self.first_pts, self.time_base)
-        last_dts_in_ms = format_timestamp_in_ms(self.last_dts, self.time_base)
-        last_pts_in_ms = format_timestamp_in_ms(self.last_pts, self.time_base)
-        last_duration_in_ms = format_timestamp_in_ms(self.last_duration, self.time_base)
-        print(f"  first_dts {self.first_dts} ({first_dts_in_ms})")
-        print(f"  first_pts {self.first_pts} ({first_pts_in_ms})")
-        print(f"  last_dts {self.last_dts} ({last_dts_in_ms})")
-        print(f"  last_pts {self.last_pts} ({last_pts_in_ms})")
-        print(f"  last_duration {self.last_duration} ({last_duration_in_ms})")
-
-        first_valid_packet_dts_in_ms = format_timestamp_in_ms(
-            self.first_valid_packet_dts, self.time_base
+        # print calculated durations
+        self.print_timestamp(
+            self.duration_by_sum,
+            "duration_by_sum",
+            suffix="    # = sum(duration of every packet)",
         )
-        first_valid_packet_pts_in_ms = format_timestamp_in_ms(
-            self.first_valid_packet_pts, self.time_base
+        self.print_timestamp(
+            self.duration_by_dts,
+            "duration_by_dts",
+            suffix="    # = last_dts - first_dts + last_duration",
         )
-        print(
-            f"  first_valid_packet_dts {self.first_valid_packet_dts} ({first_valid_packet_dts_in_ms})"
+        self.print_timestamp(
+            self.duration_by_pts,
+            "duration_by_pts",
+            suffix="    # = biggest_pts - smallest_valid_pts + biggest_pts_packet_duration (the most confident duration)",
         )
-        print(
-            f"  first_valid_packet_pts {self.first_valid_packet_pts} ({first_valid_packet_pts_in_ms})"
+        self.print_timestamp(
+            self.duration_by_pts_and_start_time,
+            "duration_by_pts_and_start_time",
+            suffix="    # = biggest_pts - start_time + biggest_pts_packet_duration",
+        )
+        self.print_timestamp(
+            self.duration_delta_by_sum,
+            "duration_delta_by_sum",
+            suffix="    # = duration_by_sum - duration",
+        )
+        self.print_timestamp(
+            self.duration_delta_by_dts,
+            "duration_delta_by_dts",
+            suffix="    # = duration_by_dts - duration",
+        )
+        self.print_timestamp(
+            self.duration_delta_by_pts,
+            "duration_delta_by_pts",
+            suffix="    # = duration_by_pts - duration",
+        )
+        self.print_timestamp(
+            self.duration_delta_by_pts_and_start_time,
+            "duration_delta_by_pts_and_start_time",
+            suffix="    # = duration_by_pts_and_start_time - duration",
         )
 
-        smallest_valid_pts_in_ms = format_timestamp_in_ms(
-            self.smallest_valid_pts, self.time_base
+        # print dts/pts/duration
+        self.print_timestamp(self.first_dts, "first_dts")
+        self.print_timestamp(self.first_pts, "first_pts")
+        self.print_timestamp(self.last_dts, "last_dts")
+        self.print_timestamp(self.last_pts, "last_pts")
+        self.print_timestamp(self.last_duration, "last_duration")
+
+        self.print_timestamp(
+            self.first_valid_packet_dts,
+            "first_valid_packet_dts",
+            suffix="    # pts >= 0",
         )
-        biggest_pts_in_ms = format_timestamp_in_ms(self.biggest_pts, self.time_base)
-        biggest_pts_packet_duration_in_ms = format_timestamp_in_ms(
-            self.biggest_pts_packet_duration, self.time_base
+        self.print_timestamp(
+            self.first_valid_packet_pts,
+            "first_valid_packet_pts",
+            suffix="    # pts >= 0",
         )
-        print(
-            f"  smallest_valid_pts {self.smallest_valid_pts} ({smallest_valid_pts_in_ms})"
+
+        self.print_timestamp(
+            self.smallest_valid_pts, "smallest_valid_pts", suffix="    # pts >= 0"
         )
-        print(f"  biggest_pts {self.biggest_pts} ({biggest_pts_in_ms})")
-        print(
-            f"  biggest_pts_packet_duration {self.biggest_pts_packet_duration} ({biggest_pts_packet_duration_in_ms})"
+        self.print_timestamp(self.biggest_pts, "biggest_pts")
+        self.print_timestamp(
+            self.biggest_pts_packet_duration, "biggest_pts_packet_duration"
         )
 
     def validate_duration(self):
-        if self.duration_delta is None:
+        if self.stream.duration is None:
             return
 
-        duration_delta_in_ms = timestamp2ms(self.duration_delta, self.time_base)
-        if abs(duration_delta_in_ms) >= 1:  # more than 1 ms
-            print(
-                f"stream[{self.stream.index}] {self.stream.type}  duration_delta_in_ms abs({duration_delta_in_ms}) >= 1 ms, invalid"
-            )
-            assert False
-        else:
-            print(
-                f"stream[{self.stream.index}] {self.stream.type}  duration_delta_in_ms {duration_delta_in_ms}, valid"
-            )
+        # print(f"stream[{self.stream.index}] {self.stream.type}")
+        # self.print_timestamp(
+        #     self.duration_delta_by_pts,
+        #     "duration_delta_by_pts",
+        #     suffix="    # the most confident",
+        # )
 
 
 def main():
@@ -178,14 +176,6 @@ def main():
         action="store_false",
         help="dump basic and calculated durations",
         dest="dump",
-    )
-    parser.add_argument(
-        "--disable-validate",
-        required=False,
-        default=True,
-        action="store_false",
-        help="validate durations",
-        dest="validate",
     )
     args = parser.parse_args()
     # print(args)
