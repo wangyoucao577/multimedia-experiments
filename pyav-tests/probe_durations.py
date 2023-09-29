@@ -33,10 +33,10 @@ class StreamInfo:
     biggest_pts_packet_duration = None
 
     # calculations
-    duration_by_sum = 0
-    duration_by_dts = 0
-    duration_by_pts = 0
-    duration_by_pts_and_start_time = 0
+    duration_by_sum = None
+    duration_by_dts = None
+    duration_by_pts = None
+    duration_by_pts_and_start_time = None
     duration_delta_by_sum = None
     duration_delta_by_dts = None
     duration_delta_by_pts = None
@@ -60,6 +60,8 @@ class StreamInfo:
             self.last_pts = packet.pts
         if packet.duration is not None:
             self.last_duration = packet.duration
+            if self.duration_by_sum is None:
+                self.duration_by_sum = 0
             self.duration_by_sum += packet.duration
 
         if packet.dts is not None and packet.pts is not None and packet.pts >= 0:
@@ -100,20 +102,26 @@ class StreamInfo:
             self.duration_by_pts_and_start_time = (
                 self.biggest_pts - self.stream.start_time
             )
-        if self.last_duration is not None:
+        if self.last_duration is not None and self.duration_by_dts is not None:
             self.duration_by_dts += self.last_duration
         if self.biggest_pts_packet_duration is not None:
-            self.duration_by_pts += self.biggest_pts_packet_duration
-            self.duration_by_pts_and_start_time += self.biggest_pts_packet_duration
+            if self.duration_by_pts is not None:
+                self.duration_by_pts += self.biggest_pts_packet_duration
+            if self.duration_by_pts_and_start_time is not None:
+                self.duration_by_pts_and_start_time += self.biggest_pts_packet_duration
 
         # calc delta between calculated duration and stream duration
         if self.stream.duration is not None:
-            self.duration_delta_by_sum = self.duration_by_sum - self.stream.duration
-            self.duration_delta_by_dts = self.duration_by_dts - self.stream.duration
-            self.duration_delta_by_pts = self.duration_by_pts - self.stream.duration
-            self.duration_delta_by_pts_and_start_time = (
-                self.duration_by_pts_and_start_time - self.stream.duration
-            )
+            if self.duration_by_sum is not None:
+                self.duration_delta_by_sum = self.duration_by_sum - self.stream.duration
+            if self.duration_by_dts is not None:
+                self.duration_delta_by_dts = self.duration_by_dts - self.stream.duration
+            if self.duration_by_pts is not None:
+                self.duration_delta_by_pts = self.duration_by_pts - self.stream.duration
+            if self.duration_by_pts_and_start_time is not None:
+                self.duration_delta_by_pts_and_start_time = (
+                    self.duration_by_pts_and_start_time - self.stream.duration
+                )
 
     def print_timestamp(self, ts, name, prefix="  ", suffix=""):
         ts_in_ms = format_timestamp_in_ms(ts, self.time_base)
