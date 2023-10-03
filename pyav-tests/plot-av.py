@@ -18,6 +18,7 @@ class StreamInfo:
         self.dts_array = []
         self.pts_array = []
         self.duration_array = []
+        self.size_array = []
 
         self.dts_delta_array = []  # dts - prev_dts
 
@@ -33,6 +34,7 @@ class StreamInfo:
         self.pts_array.append(packet.pts)
         if packet.duration is not None:
             self.duration_array.append(packet.duration)
+        self.size_array.append(packet.size)
 
         if prev_dts is not None:
             dts_delta = packet.dts - prev_dts
@@ -45,22 +47,22 @@ def plot_av(window_title, v_stream, a_stream):
     AUDIO_LINE_FMT = "b+"
 
     # create axis
-    fig, axs = plt.subplots(ncols=2, nrows=2)
+    fig, axs = plt.subplots(ncols=3, nrows=3, layout="constrained")
     fig.canvas.manager.set_window_title(window_title)
 
     # dts
     axs[0, 0].set_title(f"dts")
-    axs[0, 0].set_xlabel("dts (ms)", loc="right")
+    axs[0, 0].set_xlabel("packet no.", loc="right")
     axs[0, 0].set_ylabel("dts (ms)")
     axs[0, 0].plot(
         v_stream.get_ts_array_in_ms(v_stream.dts_array),
-        v_stream.get_ts_array_in_ms(v_stream.dts_array),
+        # v_stream.get_ts_array_in_ms(v_stream.dts_array),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[0, 0].plot(
         a_stream.get_ts_array_in_ms(a_stream.dts_array),
-        a_stream.get_ts_array_in_ms(a_stream.dts_array),
+        # a_stream.get_ts_array_in_ms(a_stream.dts_array),
         AUDIO_LINE_FMT,
         label="audio",
     )
@@ -68,30 +70,44 @@ def plot_av(window_title, v_stream, a_stream):
     # axs[0, 0].legend(loc="upper left", bbox_to_anchor=(0.0, 1.02, 0.0, 0.102), ncols=2)
 
     # pts
-    v_sorted_pts_array = sorted(v_stream.pts_array)
-    a_sorted_pts_array = sorted(a_stream.pts_array)
-    axs[0, 1].set_title(f"sorted pts")
-    axs[0, 1].set_xlabel("sorted pts (ms)", loc="right")
-    axs[0, 1].set_ylabel("sorted pts (ms)")
-    axs[0, 1].yaxis.tick_right()
-    axs[0, 1].yaxis.set_label_position("right")
+    axs[0, 1].set_title(f"pts")
+    axs[0, 1].set_xlabel("packet no.", loc="right")
+    axs[0, 1].set_ylabel("pts (ms)")
+    # axs[0, 1].yaxis.tick_right()
+    # axs[0, 1].yaxis.set_label_position("right")
     axs[0, 1].plot(
-        v_stream.get_ts_array_in_ms(v_sorted_pts_array),
-        v_stream.get_ts_array_in_ms(v_sorted_pts_array),
+        v_stream.get_ts_array_in_ms(v_stream.pts_array),
+        # v_stream.get_ts_array_in_ms(v_sorted_pts_array),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[0, 1].plot(
-        a_stream.get_ts_array_in_ms(a_sorted_pts_array),
-        a_stream.get_ts_array_in_ms(a_sorted_pts_array),
+        a_stream.get_ts_array_in_ms(a_stream.pts_array),
+        # a_stream.get_ts_array_in_ms(a_sorted_pts_array),
         AUDIO_LINE_FMT,
         label="audio",
     )
     # axs[0, 1].legend()
 
+    # size
+    axs[0, 2].set_title(f"size")
+    axs[0, 2].set_xlabel("packet no.", loc="right")
+    axs[0, 2].set_ylabel("size (KB)")
+    axs[0, 2].plot(
+        [float(s) / 1024 for s in v_stream.size_array],
+        VIDEO_LINE_FMT,
+        label="video",
+    )
+    axs[0, 2].plot(
+        [float(s) / 1024 for s in a_stream.size_array],
+        AUDIO_LINE_FMT,
+        label="audio",
+    )
+    axs[0, 2].set_ylim(0)
+
     # dts delta
     axs[1, 0].set_title(f"dts delta")
-    axs[1, 0].set_xlabel("dts (ms)")
+    axs[1, 0].set_xlabel("dts (ms)", loc="right")
     axs[1, 0].set_ylabel("dts_delta (ms)")
     axs[1, 0].plot(
         v_stream.get_ts_array_in_ms(v_stream.dts_array)[1:],
@@ -109,10 +125,10 @@ def plot_av(window_title, v_stream, a_stream):
 
     # duration
     axs[1, 1].set_title(f"duration")
-    axs[1, 1].set_xlabel("dts (ms)")
+    axs[1, 1].set_xlabel("dts (ms)", loc="right")
     axs[1, 1].set_ylabel("duration (ms)")
-    axs[1, 1].yaxis.tick_right()
-    axs[1, 1].yaxis.set_label_position("right")
+    # axs[1, 1].yaxis.tick_right()
+    # axs[1, 1].yaxis.set_label_position("right")
     axs[1, 1].plot(
         v_stream.get_ts_array_in_ms(v_stream.dts_array),
         v_stream.get_ts_array_in_ms(v_stream.duration_array),
@@ -127,6 +143,7 @@ def plot_av(window_title, v_stream, a_stream):
     )
     # axs[1, 1].legend()
 
+    # fig.align_labels()
     plt.show()
 
 
