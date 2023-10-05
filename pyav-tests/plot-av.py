@@ -30,6 +30,7 @@ class StreamInfo:
             self.raw_data_list,
             dtype=np.float64,
         )
+        self.raw_data_list = []  # clean up
 
         # [[dts, dts, ...], [pts, pts, ...], [duration, duration, ...], [size, size, ...]]
         self.npdata = self.npdata.transpose()
@@ -78,6 +79,29 @@ class StreamInfo:
         bitrate[1] = bitrate[1] * 8 / 1024  # kbps
 
         return bitrate
+
+    def calc_fps(self):
+        interval = 1 / self.time_base  # 1 second
+
+        data_array = []
+
+        start_ts = self.npdata[0][0]  # first dts
+        size = 0
+
+        for d in self.npdata.transpose():  # [[dts,pts,duration,size], ...]
+            if d[0] > start_ts + interval:
+                data_array.append([start_ts, size])
+                start_ts += interval
+                size = 0
+            size += 1
+
+        fps = np.array(
+            data_array,
+            dtype=np.float64,
+        ).transpose()
+        fps[0] = fps[0] * self.time_base  # seconds
+
+        return fps
 
 
 def calc_avsync_in_seconds(v_ts, a_ts, sync_video_against_audio=True):
@@ -192,6 +216,27 @@ def plot_av(window_title, v_stream, a_stream):
     )
     axs[1, 1].set_ylim(0)
     axs[1, 1].legend()
+
+    # fps
+    v_fps_array = v_stream.calc_fps()
+    a_fps_array = a_stream.calc_fps()
+    axs[1, 2].set_title(f"fps")
+    axs[1, 2].set_xlabel("time (s)", loc="right")
+    axs[1, 2].set_ylabel("fps")
+    axs[1, 2].plot(
+        v_fps_array[0],
+        v_fps_array[1],
+        VIDEO_LINE_COLOR,
+        label="video",
+    )
+    axs[1, 2].plot(
+        a_fps_array[0],
+        a_fps_array[1],
+        AUDEO_LINE_COLOR,
+        label="audio",
+    )
+    axs[1, 2].set_ylim(0)
+    axs[1, 2].legend()
 
     # dts delta
     axs[2, 0].set_title(f"dts delta")
