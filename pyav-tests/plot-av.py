@@ -127,25 +127,72 @@ class AVPlotter:
     AUDIO_LINE_FMT = AUDEO_LINE_COLOR + "+"
     AVSYNC_LINE_COLOR = "g"
 
-    def __init__(self, window_title, v_stream, a_stream):
+    def __init__(self, window_title="", v_stream=None, a_stream=None):
         self.v_stream = v_stream
         self.a_stream = a_stream
         self.window_title = window_title
 
-    def plot(self):
+        self.subplots = {
+            "dts": self.plot_dts,
+            "pts": self.plot_pts,
+            "size": self.plot_size,
+            "bitrate": self.plot_bitrate,
+            "fps": self.plot_fps,
+            "avsync": self.plot_avsync,
+            "dts_delta": self.plot_dts_delta,
+            "duration": self.plot_duration,
+        }
+
+    def available_subplots(self):
+        return self.subplots.keys()
+
+    def decide_layout(self, subplots):
+        # decide cols/rows
+        if len(subplots) == 1 or len(subplots) == 2:  # 1x1 or 2x1
+            ncols = len(subplots)
+            nrows = 1
+            subplots_2d = [subplots]
+            return (ncols, nrows, subplots_2d)
+
+        if len(subplots) == 3 or len(subplots) == 4:  # 2x2
+            ncols = nrows = 2
+            subplots_2d = [subplots[:ncols], subplots[ncols:]]
+        elif len(subplots) == 5 or len(subplots) == 6:  # 3x2
+            ncols = 3
+            nrows = 2
+            subplots_2d = [
+                subplots[:ncols],
+                subplots[ncols:],
+            ]
+        else:  # 3x3
+            ncols = nrows = 3
+            subplots_2d = [
+                subplots[:ncols],
+                subplots[ncols : ncols * 2],
+                subplots[ncols * 2 :],
+            ]
+
+        for i in range(nrows):
+            delta = ncols - len(subplots_2d[i])
+            for j in range(delta):
+                subplots_2d[i].append(None)  # make sure ncols == nrows
+
+        return (ncols, nrows, subplots_2d)
+
+    def plot(self, subplots):
+        # layout
+        (ncols, nrows, subplots_2d) = self.decide_layout(subplots)
+        # print(subplots_2d)
+
         # create axis
-        fig, axs = plt.subplots(ncols=3, nrows=3, layout="constrained")
+        # fig, axs = plt.subplots(ncols=ncols, nrows=nrows, layout="constrained")
+        fig, axs = plt.subplot_mosaic(subplots_2d, layout="constrained")
         fig.canvas.manager.set_window_title(self.window_title)
 
-        # subplots
-        self.plot_dts(axs[0, 0])
-        self.plot_pts(axs[0, 1])
-        self.plot_size(axs[0, 2])
-        self.plot_bitrate(axs[1, 0])
-        self.plot_fps(axs[1, 1])
-        self.plot_avsync(axs[1, 2])
-        self.plot_dts_delta(axs[2, 0])
-        self.plot_duration(axs[2, 1])
+        # plot
+        for p in subplots:
+            plot_func = self.subplots[p]
+            plot_func(axs[p])
 
         # fig.align_labels()
         plt.show()
@@ -187,6 +234,7 @@ class AVPlotter:
                 self.AUDIO_LINE_FMT,
                 label="audio",
             )
+        ax.legend()
 
     def plot_size(self, ax):
         ax.set_title(f"size")
@@ -205,6 +253,7 @@ class AVPlotter:
                 label="audio",
             )
         ax.set_ylim(0)
+        ax.legend()
 
     def plot_bitrate(self, ax):
         ax.set_title(f"bitrate")
@@ -253,7 +302,7 @@ class AVPlotter:
         ax.legend()
 
     def plot_avsync(self, ax):
-        ax.set_title(f"av sync")
+        ax.set_title(f"av sync (dts diff)")
         ax.set_xlabel("time (s)", loc="right")
         ax.set_ylabel("diff (s)")
         if self.v_stream and self.a_stream:
@@ -285,6 +334,7 @@ class AVPlotter:
                 self.AUDIO_LINE_FMT,
                 label="audio",
             )
+        ax.legend()
 
     def plot_duration(self, ax):
         ax.set_title(f"duration")
@@ -306,13 +356,43 @@ class AVPlotter:
                 self.AUDIO_LINE_FMT,
                 label="audio",
             )
+        ax.legend()
+
+
+def process_args():
+    PLOT_SPLIT_DELIMETER = ","
+    available_subplots = AVPlotter().available_subplots()
+    available_subplots_options_str = PLOT_SPLIT_DELIMETER.join(available_subplots)
+
+    parser = argparse.ArgumentParser(description="plot timestamps.")
+    parser.add_argument("-i", required=True, help="input file url", dest="input")
+    parser.add_argument(
+        "--plots",
+        required=False,
+        default=available_subplots_options_str,
+        help=f"subplots to show, seperate by ','. options: {available_subplots_options_str}",
+    )
+    args = parser.parse_args()
+    # print(args)
+
+    # validate plots
+    subplots = []
+    for p in args.plots.split(PLOT_SPLIT_DELIMETER):
+        if not p in available_subplots:
+            print(f"warning: remove invalid plot '{p}'")
+            continue
+        if p in subplots:
+            print(f"warning: remove duplicate plot '{p}'")
+            continue
+        subplots.append(p)
+
+    args.plots = subplots  # make sure plots are all valid
+
+    return args
 
 
 def main():
-    parser = argparse.ArgumentParser(description="plot timestamps.")
-    parser.add_argument("-i", required=True, help="input file url", dest="input")
-    args = parser.parse_args()
-    # print(args)
+    args = process_args()
 
     # retrieve info
     streams_info = []
@@ -326,7 +406,7 @@ def main():
             si = streams_info[packet.stream_index]
             si.capture_by_packet(packet)
 
-    # process data
+    # finalize data
     for s in streams_info:
         s.finalize()
 
@@ -339,9 +419,9 @@ def main():
         if a_stream is None and s.stream_type == "audio":
             a_stream = s
 
-    # plot V/A timestamps
+    # plot
     av_plotter = AVPlotter(os.path.basename(args.input), v_stream, a_stream)
-    av_plotter.plot()
+    av_plotter.plot(args.plots)
 
 
 if __name__ == "__main__":
