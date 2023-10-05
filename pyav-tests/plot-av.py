@@ -154,16 +154,18 @@ class AVPlotter:
         ax.set_title(f"dts")
         ax.set_xlabel("packet no.", loc="right")
         ax.set_ylabel("dts (s)")
-        ax.plot(
-            self.v_stream.dts_in_seconds(),
-            self.VIDEO_LINE_FMT,
-            label="video",
-        )
-        ax.plot(
-            self.a_stream.dts_in_seconds(),
-            self.AUDIO_LINE_FMT,
-            label="audio",
-        )
+        if self.v_stream:
+            ax.plot(
+                self.v_stream.dts_in_seconds(),
+                self.VIDEO_LINE_FMT,
+                label="video",
+            )
+        if self.a_stream:
+            ax.plot(
+                self.a_stream.dts_in_seconds(),
+                self.AUDIO_LINE_FMT,
+                label="audio",
+            )
         ax.legend()
         # ax.legend(loc="upper left", bbox_to_anchor=(0.0, 1.02, 0.0, 0.102), ncols=2)
 
@@ -173,108 +175,116 @@ class AVPlotter:
         ax.set_ylabel("pts (s)")
         # ax.yaxis.tick_right()
         # ax.yaxis.set_label_position("right")
-        ax.plot(
-            self.v_stream.pts_in_seconds(),
-            self.VIDEO_LINE_FMT,
-            label="video",
-        )
-        ax.plot(
-            self.a_stream.pts_in_seconds(),
-            self.AUDIO_LINE_FMT,
-            label="audio",
-        )
-        # ax.legend()
+        if self.v_stream:
+            ax.plot(
+                self.v_stream.pts_in_seconds(),
+                self.VIDEO_LINE_FMT,
+                label="video",
+            )
+        if self.a_stream:
+            ax.plot(
+                self.a_stream.pts_in_seconds(),
+                self.AUDIO_LINE_FMT,
+                label="audio",
+            )
 
     def plot_size(self, ax):
         ax.set_title(f"size")
         ax.set_xlabel("packet no.", loc="right")
         ax.set_ylabel("size (KB)")
-        ax.plot(
-            self.v_stream.size_in_KB(),
-            self.VIDEO_LINE_FMT,
-            label="video",
-        )
-        ax.plot(
-            self.a_stream.size_in_KB(),
-            self.AUDIO_LINE_FMT,
-            label="audio",
-        )
+        if self.v_stream:
+            ax.plot(
+                self.v_stream.size_in_KB(),
+                self.VIDEO_LINE_FMT,
+                label="video",
+            )
+        if self.a_stream:
+            ax.plot(
+                self.a_stream.size_in_KB(),
+                self.AUDIO_LINE_FMT,
+                label="audio",
+            )
         ax.set_ylim(0)
 
     def plot_bitrate(self, ax):
-        v_bitrate_array = self.v_stream.calc_bitrate_in_kbps()
-        a_bitrate_array = self.a_stream.calc_bitrate_in_kbps()
         ax.set_title(f"bitrate")
         ax.set_xlabel("time (s)", loc="right")
         ax.set_ylabel("bitrate (kbps)")
-        ax.plot(
-            v_bitrate_array[0],
-            v_bitrate_array[1],
-            self.VIDEO_LINE_COLOR,
-            label="video",
-        )
-        ax.plot(
-            a_bitrate_array[0],
-            a_bitrate_array[1],
-            self.AUDEO_LINE_COLOR,
-            label="audio",
-        )
+        if self.v_stream:
+            v_bitrate_array = self.v_stream.calc_bitrate_in_kbps()
+            ax.plot(
+                v_bitrate_array[0],
+                v_bitrate_array[1],
+                self.VIDEO_LINE_COLOR,
+                label="video",
+            )
+        if self.a_stream:
+            a_bitrate_array = self.a_stream.calc_bitrate_in_kbps()
+            ax.plot(
+                a_bitrate_array[0],
+                a_bitrate_array[1],
+                self.AUDEO_LINE_COLOR,
+                label="audio",
+            )
         ax.set_ylim(0)
         ax.legend()
 
     def plot_fps(self, ax):
-        v_fps_array = self.v_stream.calc_fps()
-        a_fps_array = self.a_stream.calc_fps()
         ax.set_title(f"fps")
         ax.set_xlabel("time (s)", loc="right")
         ax.set_ylabel("fps")
-        ax.plot(
-            v_fps_array[0],
-            v_fps_array[1],
-            self.VIDEO_LINE_COLOR,
-            label="video",
-        )
-        ax.plot(
-            a_fps_array[0],
-            a_fps_array[1],
-            self.AUDEO_LINE_COLOR,
-            label="audio",
-        )
+        if self.v_stream:
+            v_fps_array = self.v_stream.calc_fps()
+            ax.plot(
+                v_fps_array[0],
+                v_fps_array[1],
+                self.VIDEO_LINE_COLOR,
+                label="video",
+            )
+        if self.a_stream:
+            a_fps_array = self.a_stream.calc_fps()
+            ax.plot(
+                a_fps_array[0],
+                a_fps_array[1],
+                self.AUDEO_LINE_COLOR,
+                label="audio",
+            )
         ax.set_ylim(0)
         ax.legend()
 
     def plot_avsync(self, ax):
-        (base_ts, sync_ts) = calc_avsync_in_seconds(
-            self.v_stream.dts_in_seconds(),
-            self.a_stream.dts_in_seconds(),
-        )
         ax.set_title(f"av sync")
         ax.set_xlabel("time (s)", loc="right")
         ax.set_ylabel("diff (s)")
-        ax.plot(
-            base_ts,
-            sync_ts,
-            self.AVSYNC_LINE_COLOR,
-        )
-        # ax.legend()
+        if self.v_stream and self.a_stream:
+            (base_ts, sync_ts) = calc_avsync_in_seconds(
+                self.v_stream.dts_in_seconds(),
+                self.a_stream.dts_in_seconds(),
+            )
+            ax.plot(
+                base_ts,
+                sync_ts,
+                self.AVSYNC_LINE_COLOR,
+            )
 
     def plot_dts_delta(self, ax):
         ax.set_title(f"dts delta")
         ax.set_xlabel("dts (s)", loc="right")
         ax.set_ylabel("dts_delta (s)")
-        ax.plot(
-            self.v_stream.dts_in_seconds(),
-            self.v_stream.calc_dts_delta_in_seconds(),
-            self.VIDEO_LINE_FMT,
-            label="video",
-        )
-        ax.plot(
-            self.a_stream.dts_in_seconds(),
-            self.a_stream.calc_dts_delta_in_seconds(),
-            self.AUDIO_LINE_FMT,
-            label="audio",
-        )
-        # ax.legend()
+        if self.v_stream:
+            ax.plot(
+                self.v_stream.dts_in_seconds(),
+                self.v_stream.calc_dts_delta_in_seconds(),
+                self.VIDEO_LINE_FMT,
+                label="video",
+            )
+        if self.a_stream:
+            ax.plot(
+                self.a_stream.dts_in_seconds(),
+                self.a_stream.calc_dts_delta_in_seconds(),
+                self.AUDIO_LINE_FMT,
+                label="audio",
+            )
 
     def plot_duration(self, ax):
         ax.set_title(f"duration")
@@ -282,19 +292,20 @@ class AVPlotter:
         ax.set_ylabel("duration (s)")
         # ax.yaxis.tick_right()
         # ax.yaxis.set_label_position("right")
-        ax.plot(
-            self.v_stream.dts_in_seconds(),
-            self.v_stream.duration_in_seconds(),
-            self.VIDEO_LINE_FMT,
-            label="video",
-        )
-        ax.plot(
-            self.a_stream.dts_in_seconds(),
-            self.a_stream.duration_in_seconds(),
-            self.AUDIO_LINE_FMT,
-            label="audio",
-        )
-        # ax.legend()
+        if self.v_stream:
+            ax.plot(
+                self.v_stream.dts_in_seconds(),
+                self.v_stream.duration_in_seconds(),
+                self.VIDEO_LINE_FMT,
+                label="video",
+            )
+        if self.a_stream:
+            ax.plot(
+                self.a_stream.dts_in_seconds(),
+                self.a_stream.duration_in_seconds(),
+                self.AUDIO_LINE_FMT,
+                label="audio",
+            )
 
 
 def main():
