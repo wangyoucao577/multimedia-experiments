@@ -12,55 +12,48 @@ class StreamInfo:
         self.stream_type = stream.type
         self.time_base = stream.time_base
 
-        # raw data from packets
-        self.dts_array = []
-        self.pts_array = []
-        self.duration_array = []
-        self.size_array = []
+        # raw data from packets: [[dts, pts, duration, size], [dts, pts, duration, size], ...]
+        self.raw_data_list = []
 
-        self.data_array = None
+        # numpy array
+        self.npdata = None
 
     def capture_by_packet(self, packet):
-        self.dts_array.append(packet.dts)
-        self.pts_array.append(packet.pts)
-        self.duration_array.append(packet.duration)
-        self.size_array.append(packet.size)
+        self.raw_data_list.append(
+            [packet.dts, packet.pts, packet.duration, packet.size]
+        )
 
     def finalize(self):
         # construct data array
-        self.data_array = np.array(
-            [
-                self.dts_array,
-                self.pts_array,
-                self.duration_array,
-                self.size_array,
-                self.dts_array,  # for dts_delta calculation
-            ],
+        # [[dts, pts, duration, size], [dts, pts, duration, size], ...]
+        self.npdata = np.array(
+            self.raw_data_list,
             dtype=np.float64,
         )
 
-        # calculate dts_delta = dts - prev_dts
-        self.data_array[4] = np.roll(self.data_array[4], -1)
-        self.data_array[4][-1] = np.nan  # ignore last value
-        self.data_array[4] = self.data_array[4] - self.data_array[0]
-
-        # [[dts, pts, duration, size], [dts, pts, duration, size], [...]]
-        # self.data_array.transpose()
+        # [[dts, dts, ...], [pts, pts, ...], [duration, duration, ...], [size, size, ...]]
+        self.npdata = self.npdata.transpose()
 
     def dts_array_in_seconds(self):
-        return self.data_array[0] * self.time_base
+        return self.npdata[0] * self.time_base
 
     def pts_array_in_seconds(self):
-        return self.data_array[1] * self.time_base
+        return self.npdata[1] * self.time_base
 
     def duration_array_in_seconds(self):
-        return self.data_array[2] * self.time_base
+        return self.npdata[2] * self.time_base
 
     def size_array_in_KB(self):
-        return self.data_array[3] / 1024.0
+        return self.npdata[3] / 1024.0
 
     def dts_delta_in_seconds(self):
-        return self.data_array[4] * self.time_base
+        dts_delta = self.npdata[0]
+
+        # calculate dts_delta = dts - prev_dts
+        dts_delta = np.roll(dts_delta, -1)
+        dts_delta[-1] = np.nan  # ignore last value
+        dts_delta = dts_delta - self.npdata[0]
+        return dts_delta * self.time_base
 
 
 def plot_av(window_title, v_stream, a_stream):
