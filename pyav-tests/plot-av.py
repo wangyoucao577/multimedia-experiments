@@ -55,6 +55,30 @@ class StreamInfo:
         dts_delta = dts_delta - self.npdata[0]
         return dts_delta * self.time_base
 
+    def bitrate_in_kbps(self):
+        interval = 1 / self.time_base  # 1 second
+
+        data_array = []
+
+        start_ts = self.npdata[0][0]  # first dts
+        size = 0
+
+        for d in self.npdata.transpose():  # [[dts,pts,duration,size], ...]
+            if d[0] > start_ts + interval:
+                data_array.append([start_ts, size])
+                start_ts += interval
+                size = 0
+            size += d[3]
+
+        bitrate = np.array(
+            data_array,
+            dtype=np.float64,
+        ).transpose()
+        bitrate[0] = bitrate[0] * self.time_base  # seconds
+        bitrate[1] = bitrate[1] * 8 / 1024  # kbps
+
+        return bitrate
+
 
 def plot_av(window_title, v_stream, a_stream):
     # line fmt
@@ -153,6 +177,27 @@ def plot_av(window_title, v_stream, a_stream):
         label="audio",
     )
     # axs[1, 1].legend()
+
+    # bitrate
+    v_bitrate_array = v_stream.bitrate_in_kbps()
+    a_bitrate_array = a_stream.bitrate_in_kbps()
+    axs[1, 2].set_title(f"bitrate")
+    axs[1, 2].set_xlabel("time (s)", loc="right")
+    axs[1, 2].set_ylabel("bitrate (kbps)")
+    axs[1, 2].plot(
+        v_bitrate_array[0],
+        v_bitrate_array[1],
+        "y",
+        label="video",
+    )
+    axs[1, 2].plot(
+        a_bitrate_array[0],
+        a_bitrate_array[1],
+        "b",
+        label="audio",
+    )
+    axs[1, 2].set_ylim(0)
+    axs[1, 2].legend()
 
     # fig.align_labels()
     plt.show()
