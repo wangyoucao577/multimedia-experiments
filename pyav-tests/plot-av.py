@@ -35,19 +35,19 @@ class StreamInfo:
         # [[dts, dts, ...], [pts, pts, ...], [duration, duration, ...], [size, size, ...]]
         self.npdata = self.npdata.transpose()
 
-    def dts_array_in_seconds(self):
+    def dts_in_seconds(self):
         return self.npdata[0] * self.time_base
 
-    def pts_array_in_seconds(self):
+    def pts_in_seconds(self):
         return self.npdata[1] * self.time_base
 
-    def duration_array_in_seconds(self):
+    def duration_in_seconds(self):
         return self.npdata[2] * self.time_base
 
-    def size_array_in_KB(self):
+    def size_in_KB(self):
         return self.npdata[3] / 1024.0
 
-    def dts_delta_in_seconds(self):
+    def calc_dts_delta_in_seconds(self):
         dts_delta = self.npdata[0]
 
         # calculate dts_delta = dts - prev_dts
@@ -56,7 +56,7 @@ class StreamInfo:
         dts_delta = dts_delta - self.npdata[0]
         return dts_delta * self.time_base
 
-    def bitrate_in_kbps(self):
+    def calc_bitrate_in_kbps(self):
         interval = 1 / self.time_base  # 1 second
 
         data_array = []
@@ -135,12 +135,12 @@ def plot_av(window_title, v_stream, a_stream):
     axs[0, 0].set_xlabel("packet no.", loc="right")
     axs[0, 0].set_ylabel("dts (s)")
     axs[0, 0].plot(
-        v_stream.dts_array_in_seconds(),
+        v_stream.dts_in_seconds(),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[0, 0].plot(
-        a_stream.dts_array_in_seconds(),
+        a_stream.dts_in_seconds(),
         AUDIO_LINE_FMT,
         label="audio",
     )
@@ -154,12 +154,12 @@ def plot_av(window_title, v_stream, a_stream):
     # axs[0, 1].yaxis.tick_right()
     # axs[0, 1].yaxis.set_label_position("right")
     axs[0, 1].plot(
-        v_stream.pts_array_in_seconds(),
+        v_stream.pts_in_seconds(),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[0, 1].plot(
-        a_stream.pts_array_in_seconds(),
+        a_stream.pts_in_seconds(),
         AUDIO_LINE_FMT,
         label="audio",
     )
@@ -170,12 +170,12 @@ def plot_av(window_title, v_stream, a_stream):
     axs[0, 2].set_xlabel("packet no.", loc="right")
     axs[0, 2].set_ylabel("size (KB)")
     axs[0, 2].plot(
-        v_stream.size_array_in_KB(),
+        v_stream.size_in_KB(),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[0, 2].plot(
-        a_stream.size_array_in_KB(),
+        a_stream.size_in_KB(),
         AUDIO_LINE_FMT,
         label="audio",
     )
@@ -183,8 +183,8 @@ def plot_av(window_title, v_stream, a_stream):
 
     # avsync
     (base_ts, sync_ts) = calc_avsync_in_seconds(
-        v_stream.dts_array_in_seconds(),
-        a_stream.dts_array_in_seconds(),
+        v_stream.dts_in_seconds(),
+        a_stream.dts_in_seconds(),
     )
     axs[1, 0].set_title(f"av sync")
     axs[1, 0].set_xlabel("time (s)", loc="right")
@@ -197,8 +197,8 @@ def plot_av(window_title, v_stream, a_stream):
     # axs[1, 0].legend()
 
     # bitrate
-    v_bitrate_array = v_stream.bitrate_in_kbps()
-    a_bitrate_array = a_stream.bitrate_in_kbps()
+    v_bitrate_array = v_stream.calc_bitrate_in_kbps()
+    a_bitrate_array = a_stream.calc_bitrate_in_kbps()
     axs[1, 1].set_title(f"bitrate")
     axs[1, 1].set_xlabel("time (s)", loc="right")
     axs[1, 1].set_ylabel("bitrate (kbps)")
@@ -243,14 +243,14 @@ def plot_av(window_title, v_stream, a_stream):
     axs[2, 0].set_xlabel("dts (s)", loc="right")
     axs[2, 0].set_ylabel("dts_delta (s)")
     axs[2, 0].plot(
-        v_stream.dts_array_in_seconds(),
-        v_stream.dts_delta_in_seconds(),
+        v_stream.dts_in_seconds(),
+        v_stream.calc_dts_delta_in_seconds(),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[2, 0].plot(
-        a_stream.dts_array_in_seconds(),
-        a_stream.dts_delta_in_seconds(),
+        a_stream.dts_in_seconds(),
+        a_stream.calc_dts_delta_in_seconds(),
         AUDIO_LINE_FMT,
         label="audio",
     )
@@ -263,14 +263,14 @@ def plot_av(window_title, v_stream, a_stream):
     # axs[2, 1].yaxis.tick_right()
     # axs[2, 1].yaxis.set_label_position("right")
     axs[2, 1].plot(
-        v_stream.dts_array_in_seconds(),
-        v_stream.duration_array_in_seconds(),
+        v_stream.dts_in_seconds(),
+        v_stream.duration_in_seconds(),
         VIDEO_LINE_FMT,
         label="video",
     )
     axs[2, 1].plot(
-        a_stream.dts_array_in_seconds(),
-        a_stream.duration_array_in_seconds(),
+        a_stream.dts_in_seconds(),
+        a_stream.duration_in_seconds(),
         AUDIO_LINE_FMT,
         label="audio",
     )
