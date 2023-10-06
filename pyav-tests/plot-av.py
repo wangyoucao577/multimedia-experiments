@@ -104,17 +104,17 @@ class StreamInfo:
         return fps
 
 
-def calc_avsync_in_seconds(v_ts, a_ts, sync_video_against_audio=True):
-    # sync method
-    base_ts = a_ts if sync_video_against_audio else v_ts
-    another_ts = v_ts if sync_video_against_audio else a_ts
-
+def calc_avsync_in_seconds(base_ts, another_ts):
     sync_ts = base_ts.copy()
 
+    # find nearest one for each base_ts
     for index, ts in enumerate(base_ts):
         diff_ts = np.absolute(another_ts - ts)
         min_index = np.argmin(diff_ts)
-        sync_ts[index] = diff_ts[min_index]
+        sync_ts[index] = ts - another_ts[min_index]  # base - another
+
+    if len(sync_ts) > 0:
+        sync_ts[0] = base_ts[0] - another_ts[0]  # first ts
 
     return (base_ts, sync_ts)
 
@@ -257,7 +257,7 @@ class AVPlotter:
 
     def plot_bitrate(self, ax):
         ax.set_title(f"bitrate")
-        ax.set_xlabel("time (s)", loc="right")
+        ax.set_xlabel("decode time (s)", loc="right")
         ax.set_ylabel("bitrate (kbps)")
         if self.v_stream:
             v_bitrate_array = self.v_stream.calc_bitrate_in_kbps()
@@ -280,7 +280,7 @@ class AVPlotter:
 
     def plot_fps(self, ax):
         ax.set_title(f"fps")
-        ax.set_xlabel("time (s)", loc="right")
+        ax.set_xlabel("decode time (s)", loc="right")
         ax.set_ylabel("fps")
         if self.v_stream:
             v_fps_array = self.v_stream.calc_fps()
@@ -302,13 +302,13 @@ class AVPlotter:
         ax.legend()
 
     def plot_avsync(self, ax):
-        ax.set_title(f"av sync (dts diff)")
-        ax.set_xlabel("time (s)", loc="right")
+        ax.set_title(f"av sync (a_pts-v_pts)")
+        ax.set_xlabel("presentation time (s)", loc="right")
         ax.set_ylabel("diff (s)")
         if self.v_stream and self.a_stream:
             (base_ts, sync_ts) = calc_avsync_in_seconds(
-                self.v_stream.dts_in_seconds(),
-                self.a_stream.dts_in_seconds(),
+                another_ts=np.sort(self.v_stream.pts_in_seconds()),
+                base_ts=np.sort(self.a_stream.pts_in_seconds()),
             )
             ax.plot(
                 base_ts,
@@ -317,9 +317,9 @@ class AVPlotter:
             )
 
     def plot_dts_delta(self, ax):
-        ax.set_title(f"dts delta")
+        ax.set_title(f"dts delta (dts-prev_dts)")
         ax.set_xlabel("dts (s)", loc="right")
-        ax.set_ylabel("dts_delta (s)")
+        ax.set_ylabel("delta (s)")
         if self.v_stream:
             ax.plot(
                 self.v_stream.dts_in_seconds(),
