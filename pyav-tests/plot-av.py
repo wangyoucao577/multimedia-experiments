@@ -455,7 +455,12 @@ def main():
             a_stream = s
 
     # plot
-    av_plotter = AVPlotter(os.path.basename(args.input), v_stream, a_stream)
+    window_title = os.path.basename(__file__) + " - " + os.path.basename(args.input)
+    av_plotter = AVPlotter(
+        window_title,
+        v_stream,
+        a_stream,
+    )
     av_plotter.plot(args.plots)
 
 
