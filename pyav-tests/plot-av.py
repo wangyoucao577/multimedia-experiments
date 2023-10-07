@@ -105,18 +105,53 @@ class StreamInfo:
 
 
 def calc_avsync_in_seconds(base_ts, another_ts):
-    sync_ts = base_ts.copy()
+    diff_ts = np.empty(len(base_ts))
+    diff_ts.fill(np.nan)
 
-    # find nearest one for each base_ts
-    for index, ts in enumerate(base_ts):
-        diff_ts = np.absolute(another_ts - ts)
-        min_index = np.argmin(diff_ts)
-        sync_ts[index] = ts - another_ts[min_index]  # base - another
+    # merge
+    base_data = np.array(
+        (base_ts, np.arange(len(base_ts)), np.zeros(len(base_ts)))
+    )  # use type '0' as base
+    another_data = np.array(
+        (another_ts, np.arange(len(another_ts)), np.ones(len(another_ts)))
+    )  # use type '1' as another
+    full_data = np.concatenate((base_data.T, another_data.T))
 
-    if len(sync_ts) > 0:
-        sync_ts[0] = base_ts[0] - another_ts[0]  # first ts
+    # sort by ts
+    full_rec_array = np.core.records.fromarrays(
+        full_data.T, names="ts,original_index,type", formats="float64,int64,int8"
+    )
+    full_rec_array.sort(order="ts")
 
-    return (base_ts, sync_ts)
+    # calc diff for each base_ts
+    for i in range(full_rec_array.shape[0]):
+        if full_rec_array[i][2] != 0:  # find next base ts
+            continue
+
+        curr_base_ts = full_rec_array[i][0]
+        original_index = full_rec_array[i][1]
+
+        prev_another_ts = None
+        next_another_ts = None
+
+        # find prev & next another_ts
+        for j in reversed(range(i)):
+            if full_rec_array[j][2] == 1:
+                prev_another_ts = full_rec_array[j][0]
+                break
+        for j in range(i + 1, full_rec_array.shape[0]):
+            if full_rec_array[j][2] == 1:
+                next_another_ts = full_rec_array[j][0]
+                break
+
+        candidates_array = np.array(
+            [prev_another_ts, next_another_ts], dtype=np.float64
+        )
+        candidates_diff = np.abs(candidates_array - curr_base_ts)
+        candidates_min_index = np.nanargmin(candidates_diff)
+        diff_ts[original_index] = candidates_array[candidates_min_index] - curr_base_ts
+
+    return (base_ts, diff_ts)
 
 
 class AVPlotter:
@@ -302,13 +337,13 @@ class AVPlotter:
         ax.legend()
 
     def plot_avsync(self, ax):
-        ax.set_title(f"av sync (a_pts-v_pts)")
+        ax.set_title(f"av sync")
         ax.set_xlabel("presentation time (s)", loc="right")
         ax.set_ylabel("diff (s)")
         if self.v_stream and self.a_stream:
             (base_ts, sync_ts) = calc_avsync_in_seconds(
-                another_ts=np.sort(self.v_stream.pts_in_seconds()),
                 base_ts=np.sort(self.a_stream.pts_in_seconds()),
+                another_ts=np.sort(self.v_stream.pts_in_seconds()),
             )
             ax.plot(
                 base_ts,
