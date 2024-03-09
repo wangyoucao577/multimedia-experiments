@@ -1,10 +1,6 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-if (Darwin)
-message("macOSX")
-endif()
-
 project(gst-tutorials)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 
@@ -17,3 +13,5 @@ link_libraries(${GSTREAMER_LIBRARIES})
 add_executable (basic-tutorial-1 src/basic-tutorial-1.c)
 add_executable (basic-tutorial-2 src/basic-tutorial-2.c)
 add_executable (basic-tutorial-3 src/basic-tutorial-3.c)
+add_executable (simple_initialization src/simple_initialization.c)
+add_executable (goption_initialization src/goption_initialization.c)
