@@ -1,4 +1,5 @@
 
 #cmake build folder
 build/
+.cache
 
